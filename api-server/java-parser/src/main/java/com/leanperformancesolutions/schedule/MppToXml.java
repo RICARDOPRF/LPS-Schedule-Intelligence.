@@ -15,11 +15,15 @@ public final class MppToXml {
 
         MPPReader reader = new MPPReader();
         // Schedule Intelligence needs schedule data, not saved UI/Gantt formatting.
-        // Skipping presentation data also avoids graphics/AWT dependencies in headless servers.
+        // Skipping presentation data avoids graphics/AWT dependencies on headless servers.
         reader.setReadPresentationData(false);
         ProjectFile project = reader.read(args[0]);
 
         MSPDIWriter writer = new MSPDIWriter();
+        // MPXJ deliberately disables timephased MSPDI output by default.
+        // The LPS engine needs this data to reproduce Task Usage / Resource Usage
+        // distributions for HH and to use work as an explicit physical-distribution proxy.
+        writer.setWriteTimephasedData(true);
         writer.write(project, args[1]);
     }
 }
