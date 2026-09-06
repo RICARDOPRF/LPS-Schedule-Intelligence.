@@ -10,9 +10,10 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js" defer></script>
-  <script src="config.js?v=2" defer></script>
-  <script src="api-client.js?v=2" defer></script>
-  <script src="app.js?v=5" defer></script>
+  <script src="config.js?v=3" defer></script>
+  <script src="api-client.js?v=3" defer></script>
+  <script src="app.js?v=6" defer></script>
+  <script src="bootstrap-v2.js?v=1" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -53,7 +54,7 @@
           </label>
           <div class="selected-file" id="selectedFile" hidden><div><b id="selectedName"></b><small id="selectedSize"></small></div><button id="btnClearFile" class="icon-btn">×</button></div>
           <button class="primary wide" id="btnAnalyze" disabled>Analisar cronograma</button>
-          <p class="privacy-note">Processamento local sempre que possível. Arquivos `.MPP` usam a API segura quando ela estiver configurada.</p>
+          <p class="privacy-note">O arquivo é enviado por HTTPS para o motor de leitura e descartado após o processamento. A análise técnica e as curvas são executadas automaticamente após a importação.</p>
         </div>
       </section>
 
@@ -125,11 +126,11 @@
     <form method="dialog" class="settings-card">
       <div class="dialog-head"><div><span class="eyebrow">SEGURANÇA E INTELIGÊNCIA</span><h2>API / Privacidade</h2></div><button class="icon-btn" value="cancel">×</button></div>
       <label>URL da API segura<input id="apiBase" type="url" placeholder="https://sua-api.exemplo.com"></label>
-      <p class="hint">A chave do provedor de IA nunca fica no navegador. A URL aponta para uma API controlada pela LPS.</p>
+      <p class="hint">A URL aponta para o motor de leitura LPS. O arquivo bruto não é persistido pelo parser.</p>
       <label class="toggle"><input id="learningOptIn" type="checkbox"><span>Permitir aprendizado de regras anonimizadas</span></label>
-      <p class="hint">Com essa opção, somente padrões de mapeamento/correções e métricas anonimizadas podem ser sincronizados. O arquivo bruto continua descartado por padrão.</p>
-      <label class="toggle"><input id="allowRawRetention" type="checkbox"><span>Autorizar retenção criptografada do arquivo</span></label>
-      <p class="hint danger">Desabilitado por padrão. Use apenas quando houver autorização contratual explícita para armazenar o cronograma.</p>
+      <p class="hint">Com essa opção, somente padrões de mapeamento/correções e métricas anonimizadas podem ser sincronizados.</p>
+      <label class="toggle"><input id="allowRawRetention" type="checkbox" disabled><span>Retenção de arquivo bruto desabilitada nesta versão</span></label>
+      <p class="hint danger">O parser atual processa o cronograma em área temporária e descarta o arquivo após a leitura.</p>
       <div class="dialog-actions"><button class="ghost" value="cancel">Cancelar</button><button class="primary" id="btnSaveSettings" value="default">Salvar</button></div>
     </form>
   </dialog>
