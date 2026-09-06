@@ -2,9 +2,11 @@
 'use strict';
 const nativeFetch=window.fetch.bind(window);
 const TOKEN_KEY='lps_api_session';
+const DEFAULT_API='https://lps-schedule-api-production.up.railway.app';
+if(!localStorage.getItem('lps_api_base')) localStorage.setItem('lps_api_base',DEFAULT_API);
 let loginPromise=null;
 
-function base(){return (localStorage.getItem('lps_api_base')||'').trim().replace(/\/$/,'')}
+function base(){return (localStorage.getItem('lps_api_base')||window.LPS_SCHEDULE_CONFIG?.apiBase||DEFAULT_API).trim().replace(/\/$/,'')}
 function token(){return sessionStorage.getItem(TOKEN_KEY)||''}
 function isApiRequest(input){const b=base();if(!b)return false;const url=typeof input==='string'?input:input?.url||'';return url.startsWith(b+'/')||url===b}
 function isLoginRequest(input){const url=typeof input==='string'?input:input?.url||'';return url.endsWith('/v1/auth/login')}
