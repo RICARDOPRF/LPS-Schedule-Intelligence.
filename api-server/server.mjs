@@ -9,7 +9,8 @@ import { convert } from '@byteink/mppjs';
 import { mkdtemp, writeFile, readFile, rm, mkdir, appendFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, basename, dirname } from 'node:path';
-import { randomBytes, createCipheriv, createHash } from 'node:crypto';
+import { randomBytes, createCipheriv, createHash, timingSafeEqual } from 'node:crypto';
+import { spawn } from 'node:child_process';
 
 const app=express();
 const PORT=Number(process.env.PORT||8787);
@@ -24,17 +25,20 @@ const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:80*1024*102
 let jwks=null;
 if(process.env.AUTH_JWKS_URL)jwks=createRemoteJWKSet(new URL(process.env.AUTH_JWKS_URL));
 const sessionKey=process.env.LPS_SESSION_SECRET?Buffer.from(process.env.LPS_SESSION_SECRET,'base64'):null;
+
 async function auth(req,res,next){
  try{
   const h=req.headers.authorization||'';const token=h.startsWith('Bearer ')?h.slice(7):'';
-  if(sessionKey&&sessionKey.length===32&&token){try{const {payload}=await jwtVerify(token,sessionKey,{issuer:'lps-schedule-intelligence',audience:'lps-app'});if(payload.scope==='app')return next();}catch{}}
+  if(sessionKey&&sessionKey.length===32&&token){
+   try{const {payload}=await jwtVerify(token,sessionKey,{issuer:'lps-schedule-intelligence',audience:'lps-app'});if(payload.scope==='app')return next();}catch{}
+  }
   if(jwks&&token){await jwtVerify(token,jwks,{issuer:process.env.AUTH_ISSUER||undefined,audience:process.env.AUTH_AUDIENCE||undefined});return next();}
-  if(process.env.LPS_API_TOKEN&&token&&timingSafeText(token,process.env.LPS_API_TOKEN))return next();
+  if(process.env.LPS_API_TOKEN&&token&&safeTextEqual(token,process.env.LPS_API_TOKEN))return next();
   if(!jwks&&!process.env.LPS_API_TOKEN&&!sessionKey)return res.status(503).json({error:'API authentication is not configured.'});
   return res.status(401).json({error:'Unauthorized'});
  }catch{return res.status(401).json({error:'Unauthorized'});}
 }
-function timingSafeText(a,b){const A=createHash('sha256').update(String(a)).digest(),B=createHash('sha256').update(String(b)).digest();return A.equals(B)}
+function safeTextEqual(a,b){const A=createHash('sha256').update(String(a)).digest(),B=createHash('sha256').update(String(b)).digest();return timingSafeEqual(A,B)}
 function arr(v){return v==null?[]:Array.isArray(v)?v:[v]}
 function n(v){const x=Number(v);return Number.isFinite(x)?x:0}
 function bool(v){return v===true||v===1||v==='1'||String(v).toLowerCase()==='true'}
@@ -44,6 +48,25 @@ function tp(x){if(!x)return null;return{type:String(x.Type??''),start:String(x.S
 function sanitizeName(name){return basename(name||'schedule.mpp').replace(/[^a-zA-Z0-9._-]/g,'_')}
 function keyFromEnv(name){const raw=process.env[name];if(!raw)return null;const b=Buffer.from(raw,'base64');if(b.length!==32)throw new Error(`${name} must decode to 32 bytes`);return b}
 function encrypt(buf,key){const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv),body=Buffer.concat([cipher.update(buf),cipher.final()]),tag=cipher.getAuthTag();return Buffer.concat([Buffer.from('LPS1'),iv,tag,body])}
+
+async function runCommand(command,args,timeoutMs=120000){
+ return new Promise((resolve,reject)=>{
+  const child=spawn(command,args,{stdio:['ignore','pipe','pipe']});let stderr='';
+  child.stderr.on('data',d=>{stderr+=d.toString().slice(0,8000)});
+  const timer=setTimeout(()=>{child.kill('SIGKILL');reject(new Error(`Parser timeout after ${timeoutMs}ms`))},timeoutMs);
+  child.on('error',e=>{clearTimeout(timer);reject(e)});
+  child.on('close',code=>{clearTimeout(timer);code===0?resolve():reject(new Error(`Parser exited with code ${code}: ${stderr.slice(-3000)}`))});
+ });
+}
+async function convertMppToXml(input,output){
+ const javaJar=process.env.MPXJ_FAT_JAR;
+ if(javaJar){
+  try{await runCommand(process.env.JAVA_BIN||'java',['-jar',javaJar,input,output],180000);return'mpxj-java';}
+  catch(e){console.warn('MPXJ Java parser failed; attempting native fallback:',e.message);}
+ }
+ await convert(input,output,{timeoutMs:120000});
+ return'mppjs-native';
+}
 
 function canonicalizeMSPDI(xml,sourceName){
  const parser=new XMLParser({ignoreAttributes:false,parseTagValue:false,trimValues:true});const parsed=parser.parse(xml);const P=parsed.Project||parsed.project;if(!P)throw new Error('Converted MPP did not produce MSPDI Project XML.');
@@ -62,18 +85,21 @@ function canonicalizeMSPDI(xml,sourceName){
  return{format:'Microsoft Project MPP',sourceName,project:{name:String(P.Name??sourceName),title:String(P.Title??''),start:String(P.StartDate??''),finish:String(P.FinishDate??''),statusDate:String(P.StatusDate??P.CurrentDate??'')},tasks,resources,assignments,baselines:[...baselineMap.values()],hasTimephased:tasks.some(t=>t.timephased.some(x=>x.valueHours>0)),customFieldNames:[...new Set(Object.values(fieldDefs))]};
 }
 
-app.get('/health',(req,res)=>res.json({service:'LPS Schedule Intelligence API',status:'ok',version:'0.1.0'}));
+app.get('/health',(req,res)=>res.json({service:'LPS Schedule Intelligence API',status:'ok',version:'0.2.0',mppParser:process.env.MPXJ_FAT_JAR?'mpxj-java-primary':'mppjs-native'}));
 app.post('/v1/auth/login',async(req,res)=>{
  if(!process.env.LPS_APP_PASSWORD||!sessionKey||sessionKey.length!==32)return res.status(503).json({error:'App login is not configured.'});
- const password=String(req.body?.password||'');if(!password||!timingSafeText(password,process.env.LPS_APP_PASSWORD))return res.status(401).json({error:'Invalid credentials'});
+ const password=String(req.body?.password||'');if(!password||!safeTextEqual(password,process.env.LPS_APP_PASSWORD))return res.status(401).json({error:'Invalid credentials'});
  const token=await new SignJWT({scope:'app'}).setProtectedHeader({alg:'HS256'}).setIssuer('lps-schedule-intelligence').setAudience('lps-app').setIssuedAt().setExpirationTime('12h').sign(sessionKey);
  res.json({accessToken:token,expiresIn:43200});
 });
+
 app.post('/v1/parse/mpp',auth,upload.single('file'),async(req,res)=>{
  if(!req.file||!req.file.originalname.toLowerCase().endsWith('.mpp'))return res.status(400).json({error:'Send one .mpp file in field "file".'});
  const dir=await mkdtemp(join(tmpdir(),'lps-schedule-'));const input=join(dir,sanitizeName(req.file.originalname)),output=join(dir,'converted.xml');
  try{
-  await writeFile(input,req.file.buffer,{mode:0o600});await convert(input,output);const xml=await readFile(output,'utf8');const model=canonicalizeMSPDI(xml,req.file.originalname);
+  await writeFile(input,req.file.buffer,{mode:0o600});
+  const parserEngine=await convertMppToXml(input,output);
+  const xml=await readFile(output,'utf8');const model=canonicalizeMSPDI(xml,req.file.originalname);model.parserEngine=parserEngine;
   if(String(req.body?.retain)==='true'&&String(process.env.ALLOW_RAW_RETENTION).toLowerCase()==='true'){
    const key=keyFromEnv('LPS_DATA_KEY');if(!key)throw new Error('Retention requested but LPS_DATA_KEY is missing.');const targetDir=process.env.LPS_RETENTION_DIR||'./private-retention';await mkdir(targetDir,{recursive:true,mode:0o700});const encrypted=encrypt(req.file.buffer,key);const id=randomBytes(16).toString('hex');await writeFile(join(targetDir,`${id}.mpp.enc`),encrypted,{mode:0o600});model.retentionId=id;
   }
@@ -99,7 +125,8 @@ app.post('/v1/ai/report',auth,async(req,res)=>{
  try{
   const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_MODEL,store:false,instructions:'Você é um especialista sênior em planejamento e controle de projetos industriais. Produza um parecer técnico objetivo em português do Brasil, sem inventar dados, separando fato calculado de recomendação. Máximo 180 palavras.',input:JSON.stringify(safe)})});
   if(!r.ok)return res.status(502).json({error:'AI provider error',status:r.status});const j=await r.json();const opinion=j.output_text||arr(j.output).flatMap(o=>arr(o.content)).find(c=>c.type==='output_text')?.text||'';res.json({opinion});
- }catch(e){console.error(e);res.status(502).json({error:'AI provider unavailable.'})}
+ }catch(e){console.error(e);res.status(502).json({error:'AI provider unavailable.'})
+ }
 });
 
 app.use((err,req,res,next)=>{console.error(err);res.status(400).json({error:err.message||'Bad request'})});
