@@ -1,0 +1,21 @@
+{
+  "name": "lps-schedule-intelligence-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "dependencies": {
+    "@byteink/mppjs": "^0.1.7",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "fast-xml-parser": "^5.2.5",
+    "helmet": "^8.1.0",
+    "jose": "^6.1.0",
+    "multer": "^2.0.2"
+  }
+}
