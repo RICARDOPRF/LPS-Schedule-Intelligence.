@@ -10,8 +10,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js" defer></script>
-  <script src="api-client.js?v=1" defer></script>
-  <script src="app.js?v=4" defer></script>
+  <script src="config.js?v=2" defer></script>
+  <script src="api-client.js?v=2" defer></script>
+  <script src="app.js?v=5" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -68,10 +69,7 @@
             <article><span>Distribuição temporal</span><strong id="metricTimephased">—</strong></article>
           </div>
           <div class="two-col">
-            <article class="panel">
-              <h3>Hierarquia</h3>
-              <div id="hierarchyTree" class="tree"></div>
-            </article>
+            <article class="panel"><h3>Hierarquia</h3><div id="hierarchyTree" class="tree"></div></article>
             <article class="panel">
               <h3>Escopo da análise</h3>
               <div class="form-grid">
@@ -105,10 +103,7 @@
 
         <section class="section" id="contrato">
           <div class="section-head"><div><span class="eyebrow">CONTRACT COMPLIANCE</span><h2>Conformidade contratual</h2><p>Cadastre datas e marcos exigidos pelo cliente e confronte com o cronograma recebido.</p></div><button class="secondary" id="btnAddMilestone">+ Adicionar requisito</button></div>
-          <div class="two-col">
-            <article class="panel"><h3>Requisitos do cliente</h3><div class="table-wrap"><table><thead><tr><th>Marco / Entrega</th><th>Regra</th><th>Data</th><th></th></tr></thead><tbody id="contractInputBody"></tbody></table></div></article>
-            <article class="panel"><h3>Resultado</h3><div id="contractSummary" class="contract-summary muted-box">Cadastre requisitos e execute a verificação.</div><div id="contractResults"></div><button class="primary" id="btnCheckContract">Verificar conformidade</button></article>
-          </div>
+          <div class="two-col"><article class="panel"><h3>Requisitos do cliente</h3><div class="table-wrap"><table><thead><tr><th>Marco / Entrega</th><th>Regra</th><th>Data</th><th></th></tr></thead><tbody id="contractInputBody"></tbody></table></div></article><article class="panel"><h3>Resultado</h3><div id="contractSummary" class="contract-summary muted-box">Cadastre requisitos e execute a verificação.</div><div id="contractResults"></div><button class="primary" id="btnCheckContract">Verificar conformidade</button></article></div>
         </section>
 
         <section class="section" id="revisoes">
@@ -138,7 +133,6 @@
       <div class="dialog-actions"><button class="ghost" value="cancel">Cancelar</button><button class="primary" id="btnSaveSettings" value="default">Salvar</button></div>
     </form>
   </dialog>
-
   <div class="toast" id="toast" hidden></div>
 </body>
 </html>
