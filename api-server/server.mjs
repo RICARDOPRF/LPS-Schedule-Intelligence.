@@ -3,12 +3,12 @@ import helmet from 'helmet';
 import cors from 'cors';
 import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createRemoteJWKSet, jwtVerify, SignJWT } from 'jose';
 import { XMLParser } from 'fast-xml-parser';
 import { convert } from '@byteink/mppjs';
 import { mkdtemp, writeFile, readFile, rm, mkdir, appendFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, basename } from 'node:path';
+import { join, basename, dirname } from 'node:path';
 import { randomBytes, createCipheriv, createHash } from 'node:crypto';
 
 const app=express();
@@ -23,12 +23,14 @@ const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:80*1024*102
 
 let jwks=null;
 if(process.env.AUTH_JWKS_URL)jwks=createRemoteJWKSet(new URL(process.env.AUTH_JWKS_URL));
+const sessionKey=process.env.LPS_SESSION_SECRET?Buffer.from(process.env.LPS_SESSION_SECRET,'base64'):null;
 async function auth(req,res,next){
  try{
   const h=req.headers.authorization||'';const token=h.startsWith('Bearer ')?h.slice(7):'';
+  if(sessionKey&&sessionKey.length===32&&token){try{const {payload}=await jwtVerify(token,sessionKey,{issuer:'lps-schedule-intelligence',audience:'lps-app'});if(payload.scope==='app')return next();}catch{}}
   if(jwks&&token){await jwtVerify(token,jwks,{issuer:process.env.AUTH_ISSUER||undefined,audience:process.env.AUTH_AUDIENCE||undefined});return next();}
   if(process.env.LPS_API_TOKEN&&token&&timingSafeText(token,process.env.LPS_API_TOKEN))return next();
-  if(!jwks&&!process.env.LPS_API_TOKEN)return res.status(503).json({error:'API authentication is not configured.'});
+  if(!jwks&&!process.env.LPS_API_TOKEN&&!sessionKey)return res.status(503).json({error:'API authentication is not configured.'});
   return res.status(401).json({error:'Unauthorized'});
  }catch{return res.status(401).json({error:'Unauthorized'});}
 }
@@ -61,6 +63,12 @@ function canonicalizeMSPDI(xml,sourceName){
 }
 
 app.get('/health',(req,res)=>res.json({service:'LPS Schedule Intelligence API',status:'ok',version:'0.1.0'}));
+app.post('/v1/auth/login',async(req,res)=>{
+ if(!process.env.LPS_APP_PASSWORD||!sessionKey||sessionKey.length!==32)return res.status(503).json({error:'App login is not configured.'});
+ const password=String(req.body?.password||'');if(!password||!timingSafeText(password,process.env.LPS_APP_PASSWORD))return res.status(401).json({error:'Invalid credentials'});
+ const token=await new SignJWT({scope:'app'}).setProtectedHeader({alg:'HS256'}).setIssuer('lps-schedule-intelligence').setAudience('lps-app').setIssuedAt().setExpirationTime('12h').sign(sessionKey);
+ res.json({accessToken:token,expiresIn:43200});
+});
 app.post('/v1/parse/mpp',auth,upload.single('file'),async(req,res)=>{
  if(!req.file||!req.file.originalname.toLowerCase().endsWith('.mpp'))return res.status(400).json({error:'Send one .mpp file in field "file".'});
  const dir=await mkdtemp(join(tmpdir(),'lps-schedule-'));const input=join(dir,sanitizeName(req.file.originalname)),output=join(dir,'converted.xml');
@@ -77,12 +85,12 @@ app.post('/v1/parse/mpp',auth,upload.single('file'),async(req,res)=>{
 app.post('/v1/learning/observe',auth,async(req,res)=>{
  try{
   const allowed={at:new Date().toISOString(),format:String(req.body?.format||'').slice(0,80),taskCount:Math.max(0,n(req.body?.taskCount)),resourceCount:Math.max(0,n(req.body?.resourceCount)),baselineCount:Math.max(0,n(req.body?.baselineCount)),hasTimephased:!!req.body?.hasTimephased,disciplineCoverage:Math.max(0,Math.min(1,n(req.body?.disciplineCoverage))),customFieldHashes:arr(req.body?.customFieldHashes).slice(0,100).map(x=>String(x).slice(0,128))};
-  const key=keyFromEnv('LPS_LEARNING_KEY');if(!key)return res.status(503).json({error:'Learning store encryption key is not configured.'});const path=process.env.LPS_LEARNING_STORE||'./private-learning/events.ndjson.enc';await mkdir(join(path,'..'),{recursive:true,mode:0o700}).catch(()=>{});const enc=encrypt(Buffer.from(JSON.stringify(allowed)),key).toString('base64');await appendFile(path,enc+'\n',{mode:0o600});res.json({ok:true,stored:'anonymized-encrypted-event'});
+  const key=keyFromEnv('LPS_LEARNING_KEY');if(!key)return res.status(503).json({error:'Learning store encryption key is not configured.'});const path=process.env.LPS_LEARNING_STORE||'./private-learning/events.ndjson.enc';await mkdir(dirname(path),{recursive:true,mode:0o700}).catch(()=>{});const enc=encrypt(Buffer.from(JSON.stringify(allowed)),key).toString('base64');await appendFile(path,enc+'\n',{mode:0o600});res.json({ok:true,stored:'anonymized-encrypted-event'});
  }catch(e){console.error(e);res.status(500).json({error:'Could not store learning event.'})}
 });
 
 app.post('/v1/learning/correction',auth,async(req,res)=>{
- try{const rule={at:new Date().toISOString(),patternHash:String(req.body?.patternHash||'').slice(0,128),fieldHash:String(req.body?.fieldHash||'').slice(0,128),classification:String(req.body?.classification||'').slice(0,100),confidence:Math.max(0,Math.min(1,n(req.body?.confidence)))};if(!rule.patternHash&&!rule.fieldHash)return res.status(400).json({error:'Hashed pattern or field is required.'});const key=keyFromEnv('LPS_LEARNING_KEY');if(!key)return res.status(503).json({error:'Learning store encryption key is not configured.'});const path=process.env.LPS_LEARNING_STORE||'./private-learning/events.ndjson.enc';await mkdir(join(path,'..'),{recursive:true,mode:0o700}).catch(()=>{});await appendFile(path,encrypt(Buffer.from(JSON.stringify(rule)),key).toString('base64')+'\n',{mode:0o600});res.json({ok:true})}catch(e){res.status(500).json({error:'Could not store correction.'})}
+ try{const rule={at:new Date().toISOString(),patternHash:String(req.body?.patternHash||'').slice(0,128),fieldHash:String(req.body?.fieldHash||'').slice(0,128),classification:String(req.body?.classification||'').slice(0,100),confidence:Math.max(0,Math.min(1,n(req.body?.confidence)))};if(!rule.patternHash&&!rule.fieldHash)return res.status(400).json({error:'Hashed pattern or field is required.'});const key=keyFromEnv('LPS_LEARNING_KEY');if(!key)return res.status(503).json({error:'Learning store encryption key is not configured.'});const path=process.env.LPS_LEARNING_STORE||'./private-learning/events.ndjson.enc';await mkdir(dirname(path),{recursive:true,mode:0o700}).catch(()=>{});await appendFile(path,encrypt(Buffer.from(JSON.stringify(rule)),key).toString('base64')+'\n',{mode:0o600});res.json({ok:true})}catch(e){res.status(500).json({error:'Could not store correction.'})}
 });
 
 app.post('/v1/ai/report',auth,async(req,res)=>{
