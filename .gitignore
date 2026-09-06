@@ -1,0 +1,7 @@
+api-server/node_modules/
+api-server/.env
+api-server/private-retention/
+api-server/private-learning/
+*.mpp.enc
+*.ndjson.enc
+.DS_Store
