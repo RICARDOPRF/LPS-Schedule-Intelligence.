@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.leanperformancesolutions</groupId>
   <artifactId>lps-mpp-converter</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
@@ -14,6 +14,11 @@
       <groupId>net.sf.mpxj</groupId>
       <artifactId>mpxj</artifactId>
       <version>16.7.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.21.1</version>
     </dependency>
   </dependencies>
   <build>
