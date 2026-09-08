@@ -14,15 +14,23 @@
     el.textContent=msg;
     el.style.background=kind==='error'?'#991b1b':kind==='ok'?'#14532d':'#1e3a8a';
     clearTimeout(showStatus.timer);
-    showStatus.timer=setTimeout(()=>{ if(el) el.remove(); },5500);
+    showStatus.timer=setTimeout(()=>{ if(el) el.remove(); },5000);
   }
 
   function loadTemplateExporter(){
     if(document.querySelector('script[data-lps-template-exporter]'))return;
     const s=document.createElement('script');
-    s.src='panel-export-v5.js?v=20260908-5';
+    s.src='panel-export-v5.js?v=20260908-6';
     s.dataset.lpsTemplateExporter='5';
     s.onerror=()=>showStatus('Falha ao carregar o motor de Curva S / Histograma. Atualize a página.','error');
+    s.onload=()=>{
+      if(document.querySelector('script[data-lps-auto-preview]'))return;
+      const p=document.createElement('script');
+      p.src='auto-preview-v1.js?v=20260908-1';
+      p.dataset.lpsAutoPreview='1';
+      p.onerror=()=>showStatus('Falha ao carregar a geração automática das prévias.','error');
+      document.head.appendChild(p);
+    };
     document.head.appendChild(s);
   }
 
@@ -43,10 +51,11 @@
     const workspace=$('#workspace');
     if(!workspace || workspace.hidden)return;
     triggered=true;
-    showStatus('Cronograma lido. Auditando lógica e preparando os dados do Project…');
+    showStatus('Cronograma lido. Auditando lógica e gerando Curva S e Histograma automaticamente…');
     setTimeout(()=>$('#btnRunAudit')?.click(),150);
     setTimeout(()=>$('#btnBuildReport')?.click(),500);
-    setTimeout(()=>showStatus('Análise concluída. Curva S e Histograma ficam disponíveis nos botões separados.','ok'),950);
+    setTimeout(()=>window.LPS_AUTO_PREVIEW?.prepareAll?.(false),650);
+    setTimeout(()=>showStatus('Análise concluída. Curva S e Histograma ficam prontos na tela; use os botões apenas para baixar.','ok'),1300);
   }
 
   window.addEventListener('DOMContentLoaded',()=>{
