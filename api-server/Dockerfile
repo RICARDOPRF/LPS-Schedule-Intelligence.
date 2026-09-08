@@ -11,10 +11,10 @@ RUN apt-get update \
 WORKDIR /app
 COPY package.json ./package.json
 RUN npm install --omit=dev
-COPY server-v2.mjs ./server-v2.mjs
+COPY server-v3.mjs ./server-v3.mjs
 COPY --from=java-builder /build/target/lps-mpp-converter.jar /app/java/lps-mpp-converter.jar
 ENV NODE_ENV=production
 ENV PORT=8787
 ENV MPXJ_FAT_JAR=/app/java/lps-mpp-converter.jar
 EXPOSE 8787
-CMD ["node","server-v2.mjs"]
+CMD ["node","server-v3.mjs"]
