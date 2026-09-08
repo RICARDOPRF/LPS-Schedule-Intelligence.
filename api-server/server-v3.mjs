@@ -68,10 +68,10 @@ function canonicalizeMSPDI(xml,sourceName){
     const predecessors=arr(t.PredecessorLink).map(p=>({uid:String(p.PredecessorUID??''),type:relationType(p.Type),lagHours:n(p.LinkLag)/600})).filter(p=>p.uid);
     return{uid:String(t.UID??i+1),id:String(t.ID??i+1),wbs:String(t.WBS??t.OutlineNumber??''),name:String(t.Name??`Atividade ${i+1}`),outlineLevel:n(t.OutlineLevel),summary:bool(t.Summary),milestone:bool(t.Milestone),start:String(t.Start??''),finish:String(t.Finish??''),actualStart:String(t.ActualStart??''),actualFinish:String(t.ActualFinish??''),durationHours:dur(t.Duration),workHours:dur(t.Work),actualWorkHours:dur(t.ActualWork),remainingWorkHours:dur(t.RemainingWork),percentComplete:n(t.PercentComplete),physicalPercent:n(t.PhysicalPercentComplete),totalFloatHours:dur(t.TotalSlack),critical:bool(t.Critical),constraintType:String(t.ConstraintType??''),constraintDate:String(t.ConstraintDate??''),predecessors,successors:[],baselines,timephased:arr(t.TimephasedData).map(rawTimephased).filter(Boolean),baselineTimephased:[],resourceNames:[],custom,weight:0};
   }).filter(t=>t.name);
-  const resources=arr(P.Resources?.Resource).map(r=>({uid:String(r.UID??''),name:String(r.Name??''),group:String(r.Group??''),type:String(r.Type??'')})).filter(r=>r.name);
+  const resources=arr(P.Resources?.Resource).map(r=>({uid:String(r.UID??''),name:String(r.Name??''),group:String(r.Group??''),type:String(r.Type??'')})).filter(r=>r.name||r.uid);
   const taskMap=Object.fromEntries(tasks.map(t=>[t.uid,t])),resMap=Object.fromEntries(resources.map(r=>[r.uid,r]));
-  const assignments=arr(P.Assignments?.Assignment).map(a=>({uid:String(a.UID??''),taskUid:String(a.TaskUID??''),resourceUid:String(a.ResourceUID??''),workHours:dur(a.Work),actualWorkHours:dur(a.ActualWork),remainingWorkHours:dur(a.RemainingWork),timephased:arr(a.TimephasedData).map(rawTimephased).filter(Boolean),baselineTimephased:[],dailyTimephased:[]}));
-  for(const a of assignments){const t=taskMap[a.taskUid],r=resMap[a.resourceUid];if(t&&r?.name&&!t.resourceNames.includes(r.name))t.resourceNames.push(r.name)}
+  const assignments=arr(P.Assignments?.Assignment).map(a=>({uid:String(a.UID??''),taskUid:String(a.TaskUID??''),resourceUid:String(a.ResourceUID??''),resourceName:'',resourceGroup:'',workHours:dur(a.Work),actualWorkHours:dur(a.ActualWork),remainingWorkHours:dur(a.RemainingWork),timephased:arr(a.TimephasedData).map(rawTimephased).filter(Boolean),baselineTimephased:[],dailyTimephased:[]}));
+  for(const a of assignments){const t=taskMap[a.taskUid],r=resMap[a.resourceUid];if(r){a.resourceName=r.name||'';a.resourceGroup=r.group||''}if(t&&r?.name&&!t.resourceNames.includes(r.name))t.resourceNames.push(r.name)}
   for(const t of tasks)for(const rel of t.predecessors){const p=taskMap[rel.uid];if(p&&!p.successors.some(x=>x.uid===t.uid))p.successors.push({uid:t.uid,type:rel.type,lagHours:rel.lagHours})}
   const baselineMap=new Map();for(const t of tasks)for(const b of t.baselines){const cur=baselineMap.get(b.id)||{id:b.id,name:`Linha de Base ${b.id==='0'?'':b.id}`.trim(),count:0};cur.count++;baselineMap.set(b.id,cur)}
   return{format:'Microsoft Project MPP',sourceName,project:{name:String(P.Name??sourceName),title:String(P.Title??''),start:String(P.StartDate??''),finish:String(P.FinishDate??''),statusDate:String(P.StatusDate??P.CurrentDate??'')},tasks,resources,assignments,baselines:[...baselineMap.values()],hasTimephased:false,hasDailyTimephased:false,customFieldNames:[...new Set(Object.values(fieldDefs))],parserEngine:'mpxj-java'};
@@ -81,28 +81,40 @@ function mergeDailyTimephased(model,daily){
   const assignmentByUid=new Map(model.assignments.map(a=>[String(a.uid),a]));
   const assignmentByPair=new Map(model.assignments.map(a=>[`${a.taskUid}|${a.resourceUid}`,a]));
   const taskByUid=new Map(model.tasks.map(t=>[String(t.uid),t]));
-  // Daily MPXJ output replaces raw XML blocks for calculations.
-  model.tasks.forEach(t=>{t.timephased=[];t.baselineTimephased=[]});
+  const resourceByUid=new Map(model.resources.map(r=>[String(r.uid),r]));
+  model.tasks.forEach(t=>{t.timephased=[];t.baselineTimephased=[];t.resourceNames=[]});
   model.assignments.forEach(a=>{a.timephased=[];a.baselineTimephased=[];a.dailyTimephased=[]});
-  let dailyPoints=0,baselinePoints=0;
+  let dailyPoints=0,baselinePoints=0,directResourceNames=0;
   for(const src of arr(daily?.assignments)){
     const a=assignmentByUid.get(String(src.uid))||assignmentByPair.get(`${src.taskUid}|${src.resourceUid}`);if(!a)continue;
     const t=taskByUid.get(String(a.taskUid));
+    const resourceUid=String(src.resourceUid??a.resourceUid??'');
+    const directName=String(src.resourceName??'').trim();
+    const directGroup=String(src.resourceGroup??'').trim();
+    let r=resourceByUid.get(resourceUid);
+    if(directName){
+      directResourceNames++;
+      if(!r){r={uid:resourceUid,name:directName,group:directGroup,type:'WORK'};model.resources.push(r);resourceByUid.set(resourceUid,r)}
+      else{r.name=directName;if(directGroup)r.group=directGroup}
+      a.resourceName=directName;a.resourceGroup=directGroup;
+    }else if(r){a.resourceName=r.name||'';a.resourceGroup=r.group||''}
+    if(t&&a.resourceName&&!t.resourceNames.includes(a.resourceName))t.resourceNames.push(a.resourceName);
+
     for(const day of arr(src.days)){
       const date=String(day.date||'');if(!date)continue;const finish=`${date}T23:59:59`;
       const actual=n(day.actual),remaining=n(day.remaining),work=n(day.work),planned=n(day.planned);
       a.dailyTimephased.push({date,workHours:work,actualHours:actual,remainingHours:remaining,plannedHours:planned,baseline:day.baseline||{}});
-      if(Math.abs(actual)>1e-9){const p={type:'actual',start:`${date}T00:00:00`,finish,valueHours:actual};a.timephased.push(p);if(t)t.timephased.push({...p,resourceUid:a.resourceUid});dailyPoints++}
-      if(Math.abs(remaining)>1e-9){const p={type:'remaining',start:`${date}T00:00:00`,finish,valueHours:remaining};a.timephased.push(p);if(t)t.timephased.push({...p,resourceUid:a.resourceUid});dailyPoints++}
-      // Some manually scheduled assignments expose planned work while actual/remaining are empty.
-      if(Math.abs(actual)<=1e-9&&Math.abs(remaining)<=1e-9&&Math.abs(planned)>1e-9){const p={type:'planned',start:`${date}T00:00:00`,finish,valueHours:planned};a.timephased.push(p);if(t)t.timephased.push({...p,resourceUid:a.resourceUid});dailyPoints++}
+      if(Math.abs(work)>1e-9)dailyPoints++;
+      if(Math.abs(actual)>1e-9){const p={type:'actual',start:`${date}T00:00:00`,finish,valueHours:actual};a.timephased.push(p);if(t)t.timephased.push({...p,resourceUid:a.resourceUid});}
+      if(Math.abs(remaining)>1e-9){const p={type:'remaining',start:`${date}T00:00:00`,finish,valueHours:remaining};a.timephased.push(p);if(t)t.timephased.push({...p,resourceUid:a.resourceUid});}
+      if(Math.abs(actual)<=1e-9&&Math.abs(remaining)<=1e-9&&Math.abs(planned)>1e-9){const p={type:'planned',start:`${date}T00:00:00`,finish,valueHours:planned};a.timephased.push(p);if(t)t.timephased.push({...p,resourceUid:a.resourceUid});}
       for(const [baselineId,valueRaw] of Object.entries(day.baseline||{})){const value=n(valueRaw);if(Math.abs(value)<=1e-9)continue;const p={baselineId:String(baselineId),start:`${date}T00:00:00`,finish,valueHours:value};a.baselineTimephased.push(p);if(t)t.baselineTimephased.push({...p,resourceUid:a.resourceUid});baselinePoints++}
     }
   }
-  model.hasDailyTimephased=dailyPoints>0;model.hasTimephased=model.hasDailyTimephased;model.dailyTimephasedPoints=dailyPoints;model.baselineTimephasedPoints=baselinePoints;return model;
+  model.hasDailyTimephased=dailyPoints>0;model.hasTimephased=model.hasDailyTimephased;model.dailyTimephasedPoints=dailyPoints;model.baselineTimephasedPoints=baselinePoints;model.directResourceNames=directResourceNames;model.resourceNameSource=directResourceNames?'mpxj-direct':'mspdi';return model;
 }
 
-app.get('/health',(req,res)=>res.json({service:'LPS Schedule Intelligence API',status:'ok',version:'0.4.0',mppParser:'mpxj-java-daily',retention:false}));
+app.get('/health',(req,res)=>res.json({service:'LPS Schedule Intelligence API',status:'ok',version:'0.5.0',mppParser:'mpxj-java-daily-resource',retention:false}));
 app.get('/tools/lps-mpp-converter.jar',(req,res)=>res.download(process.env.MPXJ_FAT_JAR||'/app/java/lps-mpp-converter.jar','lps-mpp-converter.jar'));
 app.post('/v1/parse/mpp',parseLimiter,upload.single('file'),async(req,res)=>{
   if(!req.file||!req.file.originalname.toLowerCase().endsWith('.mpp'))return res.status(400).json({error:'Selecione um arquivo .MPP válido.'});
@@ -118,4 +130,4 @@ app.post('/v1/learning/observe',(req,res)=>res.status(204).end());
 app.post('/v1/learning/correction',(req,res)=>res.status(204).end());
 app.post('/v1/ai/report',(req,res)=>res.status(503).json({error:'IA opcional ainda não configurada.'}));
 app.use((err,req,res,next)=>{if(err?.code==='LIMIT_FILE_SIZE')return res.status(413).json({error:'Arquivo maior que 80 MB.'});if(String(err?.message||'').includes('Origin not allowed'))return res.status(403).json({error:'Origem não autorizada.'});console.error(err);res.status(500).json({error:'Erro interno da API.'})});
-app.listen(PORT,'0.0.0.0',()=>console.log(`LPS Schedule Intelligence API v0.4.0 listening on ${PORT}`));
+app.listen(PORT,'0.0.0.0',()=>console.log(`LPS Schedule Intelligence API v0.5.0 listening on ${PORT}`));
