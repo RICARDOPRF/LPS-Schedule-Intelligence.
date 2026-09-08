@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.mpxj.Duration;
 import org.mpxj.LocalDateTimeRange;
 import org.mpxj.ProjectFile;
+import org.mpxj.Resource;
 import org.mpxj.ResourceAssignment;
+import org.mpxj.Task;
 import org.mpxj.TimeUnit;
 import org.mpxj.TimescaleUnits;
 import org.mpxj.common.TimescaleHelper;
@@ -108,17 +110,22 @@ public final class MppToXml {
                 days.add(day);
             }
 
-            if (days.isEmpty()) continue;
+            Resource resource = assignment.getResource();
+            Task task = assignment.getTask();
+
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("uid", String.valueOf(assignment.getUniqueID()));
             out.put("taskUid", String.valueOf(assignment.getTaskUniqueID()));
             out.put("resourceUid", String.valueOf(assignment.getResourceUniqueID()));
+            out.put("resourceName", resource == null || resource.getName() == null ? "" : resource.getName());
+            out.put("resourceGroup", resource == null || resource.getGroup() == null ? "" : resource.getGroup());
+            out.put("taskName", task == null || task.getName() == null ? "" : task.getName());
             out.put("days", days);
             assignments.add(out);
         }
 
         Map<String, Object> root = new LinkedHashMap<>();
-        root.put("version", 1);
+        root.put("version", 2);
         root.put("granularity", "day");
         root.put("assignments", assignments);
         new ObjectMapper().writeValue(new File(outputFile), root);
