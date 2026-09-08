@@ -19,11 +19,18 @@
 
   function loadTemplateExporter(){
     if(document.querySelector('script[data-lps-template-exporter]'))return;
-    const s=document.createElement('script');
-    s.src='panel-export-v3.js?v=20260908-1';
-    s.dataset.lpsTemplateExporter='3';
-    s.onerror=()=>console.error('Falha ao carregar panel-export-v3.js');
-    document.head.appendChild(s);
+    const lock=document.createElement('script');
+    lock.src='curve-layout-lock.js?v=20260908-1';
+    lock.dataset.lpsCurveLayoutLock='1';
+    lock.onerror=()=>console.error('Falha ao carregar curve-layout-lock.js');
+    lock.onload=()=>{
+      const s=document.createElement('script');
+      s.src='panel-export-v3.js?v=20260908-2';
+      s.dataset.lpsTemplateExporter='3';
+      s.onerror=()=>console.error('Falha ao carregar panel-export-v3.js');
+      document.head.appendChild(s);
+    };
+    document.head.appendChild(lock);
   }
 
   async function health(){
