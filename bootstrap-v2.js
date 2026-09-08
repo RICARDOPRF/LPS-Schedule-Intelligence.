@@ -17,6 +17,15 @@
     showStatus.timer=setTimeout(()=>{ if(el) el.remove(); },5000);
   }
 
+  function loadPanelExporter(){
+    if(document.querySelector('script[data-lps-panel-exporter]'))return;
+    const s=document.createElement('script');
+    s.src='panel-curve-export.js?v=20260908-1';
+    s.dataset.lpsPanelExporter='1';
+    s.onerror=()=>console.error('Falha ao carregar panel-curve-export.js');
+    document.head.appendChild(s);
+  }
+
   async function health(){
     try{
       const base=(localStorage.getItem('lps_api_base')||window.LPS_SCHEDULE_CONFIG?.apiBase||'').replace(/\/$/,'');
@@ -42,6 +51,7 @@
   }
 
   window.addEventListener('DOMContentLoaded',()=>{
+    loadPanelExporter();
     health();
     const workspace=$('#workspace');
     if(workspace){
