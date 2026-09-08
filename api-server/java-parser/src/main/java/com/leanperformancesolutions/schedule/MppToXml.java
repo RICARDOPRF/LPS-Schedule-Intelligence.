@@ -6,8 +6,8 @@ import org.mpxj.LocalDateTimeRange;
 import org.mpxj.ProjectFile;
 import org.mpxj.ResourceAssignment;
 import org.mpxj.TimeUnit;
+import org.mpxj.TimescaleUnits;
 import org.mpxj.common.TimescaleHelper;
-import org.mpxj.common.TimescaleUnits;
 import org.mpxj.mpp.MPPReader;
 import org.mpxj.mspdi.MSPDIWriter;
 
@@ -28,12 +28,10 @@ public final class MppToXml {
         }
 
         MPPReader reader = new MPPReader();
-        // Schedule Intelligence needs schedule data, not saved UI/Gantt formatting.
         reader.setReadPresentationData(false);
         ProjectFile project = reader.read(args[0]);
 
         MSPDIWriter writer = new MSPDIWriter();
-        // Keep raw timephased records in MSPDI as a backwards-compatible fallback.
         writer.setWriteTimephasedData(true);
         writer.write(project, args[1]);
 
