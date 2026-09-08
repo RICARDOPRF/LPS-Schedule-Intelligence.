@@ -13,7 +13,7 @@
   <script src="config.js?v=3" defer></script>
   <script src="api-client.js?v=3" defer></script>
   <script src="app.js?v=6" defer></script>
-  <script src="bootstrap-v2.js?v=1" defer></script>
+  <script src="bootstrap-v2.js?v=5" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -54,7 +54,7 @@
           </label>
           <div class="selected-file" id="selectedFile" hidden><div><b id="selectedName"></b><small id="selectedSize"></small></div><button id="btnClearFile" class="icon-btn">×</button></div>
           <button class="primary wide" id="btnAnalyze" disabled>Analisar cronograma</button>
-          <p class="privacy-note">O arquivo é enviado por HTTPS para o motor de leitura e descartado após o processamento. A análise técnica e as curvas são executadas automaticamente após a importação.</p>
+          <p class="privacy-note">O arquivo é enviado por HTTPS para o motor de leitura e descartado após o processamento. A auditoria é executada após a importação; Curva S e Histograma são gerados somente quando você aciona os respectivos botões.</p>
         </div>
       </section>
 
@@ -94,7 +94,7 @@
         </section>
 
         <section class="section" id="curvas">
-          <div class="section-head"><div><span class="eyebrow">TIMEPHASED ENGINE</span><h2>Curva S e Histograma</h2><p>Prioriza os valores distribuídos no tempo do cronograma. Quando eles não existirem, o fallback é identificado explicitamente.</p></div><div class="button-row"><button class="secondary" id="btnGenerateCurves">Gerar</button><button class="ghost" id="btnExportWorkbook">Exportar XLSX</button></div></div>
+          <div class="section-head"><div><span class="eyebrow">TASK USAGE ENGINE</span><h2>Curva S e Histograma</h2><p>Leitura das atribuições e do Uso da Tarefa diário do Project. Os arquivos são baixados nos templates oficiais, sem alterar a estrutura dos modelos.</p></div><div class="button-row"><button class="secondary" id="btnGenerateCurves">Gerar Curva S</button><button class="ghost" id="btnExportWorkbook">Gerar Histograma</button></div></div>
           <div class="chart-grid">
             <article class="panel"><div class="chart-title"><div><h3>Curva S</h3><small id="curveBasis">Base: aguardando</small></div><select id="curveGrouping"><option value="discipline">Por disciplina</option><option value="sector">Por setor</option><option value="area">Por área</option><option value="project">Consolidado</option></select></div><div class="chart-box"><canvas id="curveChart"></canvas></div></article>
             <article class="panel"><div class="chart-title"><div><h3>Histograma de HH</h3><small id="histBasis">Recursos / Trabalho</small></div><select id="histPeriod"><option value="week">Semanal</option><option value="day">Diário</option><option value="month">Mensal</option></select></div><div class="chart-box"><canvas id="histChart"></canvas></div></article>
