@@ -20,9 +20,9 @@
   function loadPanelExporter(){
     if(document.querySelector('script[data-lps-panel-exporter]'))return;
     const s=document.createElement('script');
-    s.src='panel-curve-export.js?v=20260908-1';
-    s.dataset.lpsPanelExporter='1';
-    s.onerror=()=>console.error('Falha ao carregar panel-curve-export.js');
+    s.src='panel-curve-export-v2.js?v=20260908-2';
+    s.dataset.lpsPanelExporter='2';
+    s.onerror=()=>console.error('Falha ao carregar panel-curve-export-v2.js');
     document.head.appendChild(s);
   }
 
