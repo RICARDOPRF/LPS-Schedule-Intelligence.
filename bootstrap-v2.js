@@ -10,8 +10,8 @@
   }
   function loadFirebase(){
     if(document.querySelector('script[data-lps-firebase]'))return;
-    const f=document.createElement('script');f.type='module';f.src='firebase-init.js?v=20260909-3';f.dataset.lpsFirebase='1';f.onerror=()=>showStatus('Falha ao inicializar o Firebase.','error');f.onload=()=>{
-      if(!document.querySelector('script[data-lps-auth-gate]')){const a=document.createElement('script');a.src='auth-gate-v1.js?v=20260909-1';a.dataset.lpsAuthGate='1';a.onerror=()=>showStatus('Falha ao carregar a tela de login.','error');document.head.appendChild(a)}
+    const f=document.createElement('script');f.type='module';f.src='firebase-init.js?v=20260909-4';f.dataset.lpsFirebase='1';f.onerror=()=>showStatus('Falha ao inicializar o Firebase.','error');f.onload=()=>{
+      if(!document.querySelector('script[data-lps-auth-gate]')){const a=document.createElement('script');a.src='auth-gate-v2.js?v=20260909-1';a.dataset.lpsAuthGate='2';a.onerror=()=>showStatus('Falha ao carregar a tela de login.','error');document.head.appendChild(a)}
       if(!document.querySelector('script[data-lps-schedule-history]')){const h=document.createElement('script');h.src='schedule-history-v1.js?v=20260909-1';h.dataset.lpsScheduleHistory='1';h.onerror=()=>showStatus('Falha ao carregar o histórico de análises.','error');document.head.appendChild(h)}
     };document.head.appendChild(f);
   }
