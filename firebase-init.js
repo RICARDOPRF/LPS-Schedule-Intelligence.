@@ -1,5 +1,8 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import {
+  getDatabase, ref, set, update, push, get, query, orderByChild, limitToLast, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDGbh2mn4JpiIPm8mLD8KAw3XpbcUuMOy8',
@@ -14,14 +17,19 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getDatabase(app);
 
 window.LPS_FIREBASE = {
   app,
   auth,
+  db,
+  database: { ref, set, update, push, get, query, orderByChild, limitToLast, serverTimestamp },
   config: {
     projectId: firebaseConfig.projectId,
-    authDomain: firebaseConfig.authDomain
+    authDomain: firebaseConfig.authDomain,
+    databaseURL: firebaseConfig.databaseURL
   },
+  user: auth.currentUser || null,
   ready: true
 };
 
@@ -38,5 +46,5 @@ onAuthStateChanged(auth, user => {
 });
 
 window.dispatchEvent(new CustomEvent('lps-firebase-ready', {
-  detail: { projectId: firebaseConfig.projectId }
+  detail: { projectId: firebaseConfig.projectId, database: true }
 }));
