@@ -16,7 +16,6 @@ COPY --from=java-builder /build/target/lps-mpp-converter.jar /app/java/lps-mpp-c
 ENV NODE_ENV=production
 ENV PORT=8787
 ENV MPXJ_FAT_JAR=/app/java/lps-mpp-converter.jar
-ENV OPENAI_MODEL=gpt-5.6-sol
-ENV OPENAI_REASONING_EFFORT=high
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70.0 -XX:+UseG1GC"
 EXPOSE 8787
 CMD ["node","server-v4.mjs"]
