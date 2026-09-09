@@ -27,10 +27,14 @@
     if(document.querySelector('script[data-lps-curve-preview]'))return;
     const c=document.createElement('script');c.src='curve-preview-v2.js?v=20260909-1';c.dataset.lpsCurvePreview='2';c.onerror=()=>showStatus('Falha ao carregar a prévia hierárquica da Curva S.','error');document.head.appendChild(c);
   }
+  function loadCurveWindowFix(next){
+    if(document.querySelector('script[data-lps-curve-window]')){next?.();return}
+    const c=document.createElement('script');c.src='curve-export-v6.js?v=20260909-1';c.dataset.lpsCurveWindow='6';c.onerror=()=>showStatus('Falha ao carregar a correção de horizonte da Curva S.','error');c.onload=()=>next?.();document.head.appendChild(c);
+  }
   function loadTemplateExporter(){
     if(document.querySelector('script[data-lps-template-exporter]'))return;
     const s=document.createElement('script');s.src='panel-export-v5.js?v=20260909-3';s.dataset.lpsTemplateExporter='5';s.onerror=()=>showStatus('Falha ao carregar o motor de Curva S / Histograma. Atualize a página.','error');
-    s.onload=()=>{loadCurvePreview();if(!document.querySelector('script[data-lps-auto-preview]')){const p=document.createElement('script');p.src='auto-preview-v1.js?v=20260909-3';p.dataset.lpsAutoPreview='1';p.onerror=()=>showStatus('Falha ao carregar a geração automática das prévias.','error');document.head.appendChild(p)}loadCurveSelection()};document.head.appendChild(s);
+    s.onload=()=>loadCurveWindowFix(()=>{loadCurvePreview();if(!document.querySelector('script[data-lps-auto-preview]')){const p=document.createElement('script');p.src='auto-preview-v1.js?v=20260909-3';p.dataset.lpsAutoPreview='1';p.onerror=()=>showStatus('Falha ao carregar a geração automática das prévias.','error');document.head.appendChild(p)}loadCurveSelection()});document.head.appendChild(s);
   }
   function loadAILayer(){
     if(document.querySelector('script[data-lps-ai-layer]'))return;
