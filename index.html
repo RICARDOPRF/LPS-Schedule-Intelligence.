@@ -13,7 +13,7 @@
   <script src="config.js?v=3" defer></script>
   <script src="api-client.js?v=3" defer></script>
   <script src="app.js?v=6" defer></script>
-  <script src="bootstrap-v2.js?v=5" defer></script>
+  <script src="bootstrap-v2.js?v=20260909-3" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -54,13 +54,13 @@
           </label>
           <div class="selected-file" id="selectedFile" hidden><div><b id="selectedName"></b><small id="selectedSize"></small></div><button id="btnClearFile" class="icon-btn">×</button></div>
           <button class="primary wide" id="btnAnalyze" disabled>Analisar cronograma</button>
-          <p class="privacy-note">O arquivo é enviado por HTTPS para o motor de leitura e descartado após o processamento. A auditoria é executada após a importação; Curva S e Histograma são gerados somente quando você aciona os respectivos botões.</p>
+          <p class="privacy-note">O arquivo é enviado por HTTPS para o motor de leitura e descartado após o processamento. Após a análise, Curva S e Histograma são preparados automaticamente; os botões servem apenas para baixar os templates oficiais.</p>
         </div>
       </section>
 
       <section class="workspace" id="workspace" hidden>
         <section class="section" id="estrutura">
-          <div class="section-head"><div><span class="eyebrow">MAPEAMENTO AUTOMÁTICO</span><h2>Estrutura encontrada</h2><p>Projeto → Setor → Área → Disciplina → Atividade. A hierarquia é inferida pelos campos existentes e pode ser ajustada antes da análise.</p></div><button class="secondary" id="btnValidateMapping">Validar mapeamento</button></div>
+          <div class="section-head"><div><span class="eyebrow">MAPEAMENTO AUTOMÁTICO</span><h2>Estrutura encontrada</h2><p>Projeto Geral → Obra → Área → Disciplina → Atividade. A hierarquia é inferida pelos campos existentes, WBS e níveis do cronograma.</p></div><button class="secondary" id="btnValidateMapping">Validar mapeamento</button></div>
           <div class="summary-grid">
             <article><span>Formato</span><strong id="metricFormat">—</strong></article>
             <article><span>Atividades</span><strong id="metricTasks">0</strong></article>
@@ -74,7 +74,7 @@
             <article class="panel">
               <h3>Escopo da análise</h3>
               <div class="form-grid">
-                <label>Setor<select id="filterSector"><option value="">Todos</option></select></label>
+                <label>Obra<select id="filterSector"><option value="">Todas</option></select></label>
                 <label>Área<select id="filterArea"><option value="">Todas</option></select></label>
                 <label>Disciplina<select id="filterDiscipline"><option value="">Todas</option></select></label>
                 <label>Baseline do Previsto<select id="baselineSelect"><option value="current">Cronograma atual</option></select></label>
@@ -94,9 +94,9 @@
         </section>
 
         <section class="section" id="curvas">
-          <div class="section-head"><div><span class="eyebrow">TASK USAGE ENGINE</span><h2>Curva S e Histograma</h2><p>Leitura das atribuições e do Uso da Tarefa diário do Project. Os arquivos são baixados nos templates oficiais, sem alterar a estrutura dos modelos.</p></div><div class="button-row"><button class="secondary" id="btnGenerateCurves">Gerar Curva S</button><button class="ghost" id="btnExportWorkbook">Gerar Histograma</button></div></div>
+          <div class="section-head"><div><span class="eyebrow">TASK USAGE ENGINE</span><h2>Curva S e Histograma</h2><p>Leitura das atribuições e do Uso da Tarefa diário do Project. As prévias respeitam o escopo selecionado e os arquivos são baixados nos templates oficiais.</p></div><div class="button-row"><button class="secondary" id="btnGenerateCurves">Baixar Curva S</button><button class="ghost" id="btnExportWorkbook">Baixar Histograma</button></div></div>
           <div class="chart-grid">
-            <article class="panel"><div class="chart-title"><div><h3>Curva S</h3><small id="curveBasis">Base: aguardando</small></div><select id="curveGrouping"><option value="discipline">Por disciplina</option><option value="sector">Por setor</option><option value="area">Por área</option><option value="project">Consolidado</option></select></div><div class="chart-box"><canvas id="curveChart"></canvas></div></article>
+            <article class="panel"><div class="chart-title"><div><h3>Curva S</h3><small id="curveBasis">Base: aguardando</small></div><select id="curveGrouping"><option value="discipline">Por disciplina</option><option value="sector">Por obra</option><option value="area">Por área</option><option value="project">Consolidado</option></select></div><div class="chart-box"><canvas id="curveChart"></canvas></div></article>
             <article class="panel"><div class="chart-title"><div><h3>Histograma de HH</h3><small id="histBasis">Recursos / Trabalho</small></div><select id="histPeriod"><option value="week">Semanal</option><option value="day">Diário</option><option value="month">Mensal</option></select></div><div class="chart-box"><canvas id="histChart"></canvas></div></article>
           </div>
           <div class="three-col" id="curveCards"></div>
