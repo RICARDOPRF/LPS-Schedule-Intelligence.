@@ -13,7 +13,7 @@
   <script src="config.js?v=3" defer></script>
   <script src="api-client.js?v=3" defer></script>
   <script src="app.js?v=6" defer></script>
-  <script src="bootstrap-v2.js?v=20260909-6" defer></script>
+  <script src="bootstrap-v2.js?v=20260909-7" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -96,7 +96,7 @@
         <section class="section" id="curvas">
           <div class="section-head"><div><span class="eyebrow">TASK USAGE ENGINE</span><h2>Curva S e Histograma</h2><p>Leitura das atribuições e do Uso da Tarefa diário do Project. As prévias respeitam o escopo selecionado e os arquivos são baixados nos templates oficiais.</p></div><div class="button-row"><button class="secondary" id="btnGenerateCurves">Baixar Curva S</button><button class="ghost" id="btnExportWorkbook">Baixar Histograma</button></div></div>
           <div class="chart-grid">
-            <article class="panel"><div class="chart-title"><div><h3>Curva S</h3><small id="curveBasis">Base: aguardando</small></div><select id="curveGrouping"><option value="discipline">Por disciplina</option><option value="sector">Por obra</option><option value="area">Por área</option><option value="project">Consolidado</option></select></div><div class="chart-box"><canvas id="curveChart"></canvas></div></article>
+            <article class="panel"><div class="chart-title"><div><h3>Curva S</h3><small id="curveBasis">Base: aguardando</small></div><select id="curveGrouping"><option value="project">Consolidado</option><option value="sector">Por obra</option><option value="area">Por área</option><option value="discipline">Por disciplina</option></select></div><div class="chart-box"><canvas id="curveChart"></canvas></div></article>
             <article class="panel"><div class="chart-title"><div><h3>Histograma de HH</h3><small id="histBasis">Recursos / Trabalho</small></div><select id="histPeriod"><option value="week">Semanal</option><option value="day">Diário</option><option value="month">Mensal</option></select></div><div class="chart-box"><canvas id="histChart"></canvas></div></article>
           </div>
           <div class="three-col" id="curveCards"></div>
