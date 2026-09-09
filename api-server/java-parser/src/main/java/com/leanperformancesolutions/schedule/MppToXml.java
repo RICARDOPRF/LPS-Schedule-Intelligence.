@@ -31,10 +31,16 @@ public final class MppToXml {
 
         MPPReader reader = new MPPReader();
         reader.setReadPresentationData(false);
+        // Keep the compact representation stored by Microsoft Project in memory.
+        // Daily normalization is generated on demand below, assignment by assignment.
+        // This prevents very large schedules from exploding the heap while MPPReader loads them.
+        reader.setUseRawTimephasedData(true);
         ProjectFile project = reader.read(args[0]);
 
         MSPDIWriter writer = new MSPDIWriter();
-        writer.setWriteTimephasedData(true);
+        // Daily Task Usage is exported separately to JSON. Writing it again into MSPDI
+        // duplicates a very large amount of data and is unnecessary for the LPS parser.
+        writer.setWriteTimephasedData(false);
         writer.write(project, args[1]);
 
         if (args.length == 3) {
@@ -125,8 +131,9 @@ public final class MppToXml {
         }
 
         Map<String, Object> root = new LinkedHashMap<>();
-        root.put("version", 2);
+        root.put("version", 3);
         root.put("granularity", "day");
+        root.put("source", "mpxj-raw-timephased-normalized-on-demand");
         root.put("assignments", assignments);
         new ObjectMapper().writeValue(new File(outputFile), root);
     }
