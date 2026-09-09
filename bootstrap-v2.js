@@ -8,6 +8,10 @@
     if(!el){el=document.createElement('div');el.id='engineStatus';el.style.cssText='position:fixed;right:18px;bottom:18px;z-index:9999;max-width:500px;padding:12px 16px;border-radius:12px;background:#1e3a8a;color:white;box-shadow:0 10px 30px #0003;font:600 13px/1.4 Inter,Arial,sans-serif';document.body.appendChild(el)}
     el.textContent=msg;el.style.background=kind==='error'?'#991b1b':kind==='ok'?'#14532d':'#1e3a8a';clearTimeout(showStatus.timer);showStatus.timer=setTimeout(()=>{if(el)el.remove()},5500);
   }
+  function loadFirebase(){
+    if(document.querySelector('script[data-lps-firebase]'))return;
+    const f=document.createElement('script');f.type='module';f.src='firebase-init.js?v=20260909-2';f.dataset.lpsFirebase='1';f.onerror=()=>showStatus('Falha ao inicializar o Firebase.','error');f.onload=()=>{if(document.querySelector('script[data-lps-schedule-history]'))return;const h=document.createElement('script');h.src='schedule-history-v1.js?v=20260909-1';h.dataset.lpsScheduleHistory='1';h.onerror=()=>showStatus('Falha ao carregar o histórico de análises.','error');document.head.appendChild(h)};document.head.appendChild(f);
+  }
   function loadMultiobra(){
     if(document.querySelector('script[data-lps-multiobra]'))return;
     const m=document.createElement('script');m.src='multiobra-v1.js?v=20260909-4';m.dataset.lpsMultiobra='1';m.onerror=()=>showStatus('Falha ao carregar o motor Multiobra.','error');document.head.appendChild(m);
@@ -31,7 +35,7 @@
   }
 
   window.addEventListener('DOMContentLoaded',()=>{
-    loadMultiobra();loadTemplateExporter();loadAILayer();health();
+    loadFirebase();loadMultiobra();loadTemplateExporter();loadAILayer();health();
     const workspace=$('#workspace');if(workspace)new MutationObserver(runAfterImport).observe(workspace,{attributes:true,attributeFilter:['hidden']});
     $('#scheduleFile')?.addEventListener('change',()=>{triggered=false});
     $('#btnAnalyze')?.addEventListener('click',()=>{triggered=false;showStatus('Lendo todas as tarefas, WBS, campos, recursos e distribuições diárias…')},true);
