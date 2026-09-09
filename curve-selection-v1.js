@@ -1,6 +1,7 @@
 (()=>{
 'use strict';
 const $=s=>document.querySelector(s);
+const esc=s=>(s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 let renderedKey='';
 const selected=new Set();
 
@@ -35,7 +36,7 @@ function render(){
   const obras=model.lpsHierarchy?.obras||[];const key=obras.join('|');const box=ensureBox();if(!box)return;
   if(key===renderedKey)return;renderedKey=key;
   const checks=$('#curveObraChecks');if(!checks)return;
-  const hadSelection=selected.size>0;checks.innerHTML=obras.map((o,idx)=>{const checked=hadSelection?selected.has(o):true;return `<label style="display:flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;cursor:pointer;font-weight:800;color:#172554"><input type="checkbox" data-obra-download value="${String(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" ${checked?'checked':''} style="width:17px;height:17px;accent-color:#1e3a8a"> <span>${o}</span></label>`}).join('');
+  const hadSelection=selected.size>0;checks.innerHTML=obras.map(o=>{const checked=hadSelection?selected.has(o):true;return `<label style="display:flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;cursor:pointer;font-weight:800;color:#172554"><input type="checkbox" data-obra-download value="${esc(o)}" ${checked?'checked':''} style="width:17px;height:17px;accent-color:#1e3a8a"> <span>${esc(o)}</span></label>`}).join('');
   checks.querySelectorAll('input[data-obra-download]').forEach(i=>i.addEventListener('change',updateCount));updateCount();
 }
 async function waitEngine(timeout=12000){const start=Date.now();while(!window.LPS_TEMPLATE_ENGINE){if(Date.now()-start>timeout)throw new Error('Motor de Curva S não carregou.');await new Promise(r=>setTimeout(r,120))}return window.LPS_TEMPLATE_ENGINE}
