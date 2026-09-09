@@ -10,16 +10,16 @@
   }
   function loadMultiobra(){
     if(document.querySelector('script[data-lps-multiobra]'))return;
-    const m=document.createElement('script');m.src='multiobra-v1.js?v=20260909-3';m.dataset.lpsMultiobra='1';m.onerror=()=>showStatus('Falha ao carregar o motor Multiobra.','error');document.head.appendChild(m);
+    const m=document.createElement('script');m.src='multiobra-v1.js?v=20260909-4';m.dataset.lpsMultiobra='1';m.onerror=()=>showStatus('Falha ao carregar o motor Multiobra.','error');document.head.appendChild(m);
   }
   function loadTemplateExporter(){
     if(document.querySelector('script[data-lps-template-exporter]'))return;
-    const s=document.createElement('script');s.src='panel-export-v5.js?v=20260909-2';s.dataset.lpsTemplateExporter='5';s.onerror=()=>showStatus('Falha ao carregar o motor de Curva S / Histograma. Atualize a página.','error');
-    s.onload=()=>{if(document.querySelector('script[data-lps-auto-preview]'))return;const p=document.createElement('script');p.src='auto-preview-v1.js?v=20260909-2';p.dataset.lpsAutoPreview='1';p.onerror=()=>showStatus('Falha ao carregar a geração automática das prévias.','error');document.head.appendChild(p)};document.head.appendChild(s);
+    const s=document.createElement('script');s.src='panel-export-v5.js?v=20260909-3';s.dataset.lpsTemplateExporter='5';s.onerror=()=>showStatus('Falha ao carregar o motor de Curva S / Histograma. Atualize a página.','error');
+    s.onload=()=>{if(document.querySelector('script[data-lps-auto-preview]'))return;const p=document.createElement('script');p.src='auto-preview-v1.js?v=20260909-3';p.dataset.lpsAutoPreview='1';p.onerror=()=>showStatus('Falha ao carregar a geração automática das prévias.','error');document.head.appendChild(p)};document.head.appendChild(s);
   }
   function loadAILayer(){
     if(document.querySelector('script[data-lps-ai-layer]'))return;
-    const a=document.createElement('script');a.src='ai-layer-v1.js?v=20260909-2';a.dataset.lpsAiLayer='1';a.onerror=()=>showStatus('Falha ao carregar a camada GPT-5.6 Sol.','error');document.head.appendChild(a);
+    const bridge=document.createElement('script');bridge.src='ai-bridge-v2.js?v=20260909-1';bridge.dataset.lpsAiBridge='2';bridge.onerror=()=>showStatus('Falha ao carregar a ponte da IA.','error');bridge.onload=()=>{const a=document.createElement('script');a.src='ai-layer-v1.js?v=20260909-4';a.dataset.lpsAiLayer='1';a.onerror=()=>showStatus('Falha ao carregar a camada GPT-5.6 Sol.','error');document.head.appendChild(a)};document.head.appendChild(bridge);
   }
   async function health(){try{const base=(localStorage.getItem('lps_api_base')||window.LPS_SCHEDULE_CONFIG?.apiBase||'').replace(/\/$/,'');if(!base)return;const r=await fetch(base+'/health',{cache:'no-store'});if(r.ok){window.LPS_ENGINE_HEALTH=await r.json();document.documentElement.dataset.lpsApiVersion=window.LPS_ENGINE_HEALTH?.version||''}}catch(e){console.warn('LPS health unavailable',e)}}
 
