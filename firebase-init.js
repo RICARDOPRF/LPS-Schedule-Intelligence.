@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
 import {
-  getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
+  getAuth, onAuthStateChanged,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, signOut
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
@@ -22,11 +22,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 const authApi = {
-  signInGoogle: () => signInWithPopup(auth, googleProvider),
   signInEmail: (email, password) => signInWithEmailAndPassword(auth, email, password),
   createAccount: (email, password) => createUserWithEmailAndPassword(auth, email, password),
   resetPassword: email => sendPasswordResetEmail(auth, email),
@@ -62,5 +59,5 @@ onAuthStateChanged(auth, user => {
 });
 
 window.dispatchEvent(new CustomEvent('lps-firebase-ready', {
-  detail: { projectId: firebaseConfig.projectId, database: true, auth: true }
+  detail: { projectId: firebaseConfig.projectId, database: true, auth: true, providers: ['password'] }
 }));
