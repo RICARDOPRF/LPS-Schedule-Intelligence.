@@ -1,0 +1,79 @@
+(()=>{
+'use strict';
+
+const $=s=>document.querySelector(s);
+const CURVE_BLOCKS=[
+  ['Elétrica',1],['Mecânica',8],['Tubulação',15],['Fabricação de Tubulação',22],['Montagem de Tubulação',29],['Suportes',36],
+  ['Equipamentos',43],['Estrutura',50],['Instrumentação',57],['Automação',64],['Refratário',71],['Civil',78],['Pintura',85],['Andaime',92],['Comissionamento',99]
+];
+const FIRST_COL=3,LAST_COL=365,DAYS=LAST_COL-FIRST_COL+1;
+const norm=s=>(s??'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const safe=s=>(s||'Cronograma').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,90)||'Cronograma';
+const dateKey=v=>String(v||'').slice(0,10);
+const parseDate=v=>{const m=dateKey(v).match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):null};
+const addDays=(d,n)=>{const x=new Date(+d);x.setUTCDate(x.getUTCDate()+n);return x};
+const iso=d=>`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+const dayLabel=d=>['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getUTCDay()];
+function isoWeek(d){const x=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));const day=x.getUTCDay()||7;x.setUTCDate(x.getUTCDate()+4-day);const y0=new Date(Date.UTC(x.getUTCFullYear(),0,1));return Math.ceil((((x-y0)/86400000)+1)/7)}
+function add(map,k,v){const n=Number(v)||0;if(k&&Math.abs(n)>1e-12)map.set(k,(map.get(k)||0)+n)}
+function mergeMap(target,src){for(const[k,v]of src)add(target,k,v)}
+function sumMap(m){return[...m.values()].reduce((a,b)=>a+(Number(b)||0),0)}
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function customValue(task,re){for(const[k,v]of Object.entries(task.custom||{})){if(re.test(norm(k))&&String(v??'').trim())return String(v).trim()}return''}
+function taskText(t){return norm([t.name,t.wbs,...Object.values(t.custom||{})].filter(Boolean).join(' '))}
+function status(msg,kind='info'){
+ let el=$('#lpsTemplateExportStatus');if(!el){el=document.createElement('div');el.id='lpsTemplateExportStatus';el.style.cssText='position:fixed;right:18px;bottom:18px;z-index:10050;max-width:620px;padding:13px 16px;border-radius:12px;color:#fff;box-shadow:0 10px 30px #0004;font:700 13px/1.45 Inter,Arial,sans-serif';document.body.appendChild(el)}
+ el.textContent=msg;el.style.background=kind==='error'?'#991b1b':kind==='warn'?'#92400e':kind==='ok'?'#166534':'#1e3a8a';clearTimeout(status.timer);status.timer=setTimeout(()=>el?.remove(),kind==='ok'?9000:14000);
+}
+async function ensureExcelJS(){if(window.ExcelJS)return;await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('Não foi possível carregar o gerador XLSX.'));document.head.appendChild(s)})}
+async function saveWorkbook(wb,name){const buf=await wb.xlsx.writeBuffer();const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1800)}
+function scope(){return window.LPS_MULTIOBRA?.scope?.()||{obra:$('#filterSector')?.value||'',area:$('#filterArea')?.value||'',discipline:$('#filterDiscipline')?.value||''}}
+function inScope(t,s){return(!s.obra||norm(t.lpsObra||customValue(t,/^obra$|^setor$/))===norm(s.obra))&&(!s.area||norm(t.lpsArea||customValue(t,/^area$/))===norm(s.area))&&(!s.discipline||norm(t.lpsDiscipline||customValue(t,/^disciplina$/))===norm(s.discipline))}
+function scopedModel(full){const s=scope();if(!s.obra&&!s.area&&!s.discipline)return full;const leaves=(full.tasks||[]).filter(t=>!t.summary&&inScope(t,s)),ids=new Set(leaves.map(t=>String(t.uid))),assignments=(full.assignments||[]).filter(a=>ids.has(String(a.taskUid))),label=[s.obra,s.area,s.discipline].filter(Boolean).join(' · ');return{...full,project:{...(full.project||{}),name:`${full.project?.name||full.sourceName||'Cronograma'}${label?' - '+label:''}`},tasks:leaves,assignments,lpsScope:s}}
+async function getModel(){let full=window.LPS_MULTIOBRA?.model||window.LPS_LAST_MODEL;if(full)return scopedModel(full);const f=$('#scheduleFile')?.files?.[0];if(!f)throw new Error('Selecione e analise um cronograma .MPP primeiro.');const base=(localStorage.getItem('lps_api_base')||window.LPS_SCHEDULE_CONFIG?.apiBase||'').replace(/\/$/,'');if(!base)throw new Error('API LPS não configurada.');const fd=new FormData();fd.append('file',f,f.name);const r=await fetch(base+'/v1/parse/mpp',{method:'POST',body:fd});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||j.error||`Falha ao ler o MPP (${r.status}).`);full=window.LPS_MULTIOBRA?.enrichModel?.(j)||j;return scopedModel(full)}
+function baselineChoice(model){const ids=(model.baselines||[]).map(b=>String(b.id));const ui=String($('#baselineSelect')?.value||'current');return{plannedBaseline:(ui!=='current'&&ids.includes(ui))?ui:null,available:ids}}
+function assignmentIndex(model){const m=new Map();for(const a of model.assignments||[]){const k=String(a.taskUid);if(!m.has(k))m.set(k,[]);m.get(k).push(a)}return m}
+function fallbackDaily(start,finish,total){const m=new Map(),s=parseDate(start),f=parseDate(finish);if(!s||!f||f<s||!(total>0))return m;const days=[];for(let d=s;d<=f;d=addDays(d,1))if(![0,6].includes(d.getUTCDay()))days.push(new Date(+d));if(!days.length)for(let d=s;d<=f;d=addDays(d,1))days.push(new Date(+d));const each=total/days.length;for(const d of days)m.set(iso(d),each);return m}
+function assignmentSeries(a,kind,baselineId){const m=new Map();for(const d of a.dailyTimephased||[]){const k=dateKey(d.date);let v=0;if(kind==='actual')v=Number(d.actualHours)||0;else if(kind==='baseline')v=Number(d.baseline?.[String(baselineId)])||0;else v=Number(d.workHours)||((Number(d.actualHours)||0)+(Number(d.remainingHours)||0))||Number(d.plannedHours)||0;if(Math.abs(v)>1e-12)add(m,k,v)}return m}
+function inheritedContexts(model){const out=new Map(),stack=[];for(const t of model.tasks||[]){const level=Math.max(1,Number(t.outlineLevel)||1);while(stack.length>=level)stack.pop();const parent=stack.at(-1)||{};const phase=customValue(t,/^fase$/)||parent.phase||'';const disc=customValue(t,/^disciplina$|^discipline$/)||parent.disc||'';const panel=customValue(t,/painel bordo|painel de bordo/)||parent.panel||'';const sub=customValue(t,/^sub$|subdisciplina|subdisc|tipo do servico|tipo servico/)||parent.sub||'';const ctx={phase,disc,panel,sub};out.set(String(t.uid),ctx);stack.push(ctx)}return out}
+function phaseMemberships(task,ctx){
+ const canonical=norm(task.lpsDiscipline||customValue(task,/^disciplina$|^discipline$/));
+ if(canonical){if(/fabric.*tub/.test(canonical))return['Fabricação de Tubulação','Tubulação'];if(/montag.*tub/.test(canonical))return['Montagem de Tubulação','Tubulação'];if(/suport/.test(canonical))return['Suportes','Tubulação'];const direct=[['eletric','Elétrica'],['instrument','Instrumentação'],['automacao','Automação'],['mecan','Mecânica'],['equipamento','Equipamentos'],['estrutura','Estrutura'],['refrat','Refratário'],['civil','Civil'],['pintura','Pintura'],['andaime','Andaime'],['comission','Comissionamento'],['tubul','Tubulação']];for(const[k,l]of direct)if(canonical.includes(k))return[l]}
+ const phase=norm(ctx?.phase),disc=norm(ctx?.disc),panel=norm(ctx?.panel),sub=norm([ctx?.sub,task.name].join(' ')),all=taskText(task),source=phase||disc||panel||all;
+ if(/eletric.*instrument|instrument.*eletric/.test(source))return['Elétrica'];
+ if(/fabric.*tub|fabric.*pipe|spool/.test(source))return['Fabricação de Tubulação','Tubulação'];
+ if(/montag.*tub|montag.*pipe/.test(source))return['Montagem de Tubulação','Tubulação'];
+ if(/fabric.*suport|montag.*suport|^suport/.test(source))return['Suportes','Tubulação'];
+ if(/tubul|piping|pipe\b/.test(source)){if(/suport/.test(sub))return['Suportes','Tubulação'];if(/fabric|spool/.test(sub))return['Fabricação de Tubulação','Tubulação'];if(/montag/.test(sub))return['Montagem de Tubulação','Tubulação'];return['Tubulação']}
+ const rules=[[/eletric|electrical/,'Elétrica'],[/instrument/,'Instrumentação'],[/automacao|automation/,'Automação'],[/mecan|mechanical/,'Mecânica'],[/equipamento|equipment/,'Equipamentos'],[/estrutura|structur|steel/,'Estrutura'],[/refrat|refractory/,'Refratário'],[/civil/,'Civil'],[/pintura|painting|coating/,'Pintura'],[/andaime|scaffold/,'Andaime'],[/comission|commission|startup|start up/,'Comissionamento']];for(const[re,label]of rules)if(re.test(source))return[label];return[];
+}
+function buildSeries(model){
+ const idx=assignmentIndex(model),bc=baselineChoice(model),contexts=inheritedContexts(model),groups=new Map(CURVE_BLOCKS.map(([x])=>[x,[]]));
+ const unmapped=[];for(const t of model.tasks||[]){if(t.summary)continue;const memberships=phaseMemberships(t,contexts.get(String(t.uid)));if(!memberships.length&&(Number(t.workHours)||0)>0)unmapped.push(t);for(const g of memberships)groups.get(g)?.push(t)}
+ const results=[];let fallback=0,missingTimephased=0,baselineMissing=0;
+ for(const[label]of CURVE_BLOCKS){const tasks=groups.get(label)||[],prev=new Map(),replan=new Map(),real=new Map();for(const t of tasks){const aa=idx.get(String(t.uid))||[];if(aa.length){for(const a of aa){const current=assignmentSeries(a,'current'),actual=assignmentSeries(a,'actual');if(current.size)mergeMap(replan,current);else if((Number(a.workHours)||0)>0){missingTimephased++;mergeMap(replan,fallbackDaily(t.start,t.finish,Number(a.workHours)||0));fallback++}if(actual.size)mergeMap(real,actual);else if((Number(a.actualWorkHours)||0)>0){missingTimephased++;mergeMap(real,fallbackDaily(t.actualStart||t.start,t.actualFinish||model.project?.statusDate||t.finish,Number(a.actualWorkHours)||0));fallback++}if(bc.plannedBaseline){const base=assignmentSeries(a,'baseline',bc.plannedBaseline);if(base.size)mergeMap(prev,base);else baselineMissing++}else if(current.size)mergeMap(prev,current)}}else if((Number(t.workHours)||0)>0){missingTimephased++;const fb=fallbackDaily(t.start,t.finish,Number(t.workHours)||0);mergeMap(replan,fb);if(!bc.plannedBaseline)mergeMap(prev,fb);if((Number(t.actualWorkHours)||0)>0)mergeMap(real,fallbackDaily(t.actualStart||t.start,t.actualFinish||model.project?.statusDate||t.finish,Number(t.actualWorkHours)||0));fallback++}}
+  if(bc.plannedBaseline&&!prev.size&&replan.size){mergeMap(prev,replan);baselineMissing+=tasks.length}if(!replan.size&&prev.size)mergeMap(replan,prev);const prevTotal=sumMap(prev),replanTotal=sumMap(replan),realTotal=sumMap(real);results.push({label,tasks:tasks.length,prev,replan,real,prevTotal,replanTotal,realTotal,realPct:prevTotal?realTotal/prevTotal:0})
+ }
+ return{results,baseline:bc,fallback,missingTimephased,baselineMissing,unmapped}
+}
+function groupWindow(g,model){
+ let keys=[...new Set([...g.prev.keys(),...g.replan.keys()])].sort();if(!keys.length)keys=[...new Set([...g.real.keys()])].sort();
+ const start=parseDate(keys[0]||dateKey(model.project?.start));if(!start)return{dates:[],span:0};const last=parseDate(keys.at(-1)||keys[0]);const span=last?Math.round((last-start)/86400000)+1:1;return{dates:Array.from({length:DAYS},(_,i)=>addDays(start,i)),span,start,last}
+}
+function value(map,d){return Number(map.get(iso(d)))||0}
+const border={top:{style:'thin',color:{argb:'FF000000'}},left:{style:'thin',color:{argb:'FF000000'}},bottom:{style:'thin',color:{argb:'FF000000'}},right:{style:'thin',color:{argb:'FF000000'}}};
+const dataStyle={font:{name:'Calibri',size:11,color:{argb:'FF000000'}},alignment:{horizontal:'center',vertical:'middle'},border};
+const labelStyle={font:{name:'Calibri',size:11,bold:true,color:{argb:'FFFFFFFF'}},alignment:{horizontal:'left',vertical:'middle'},fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FF1E3A8A'}},border};
+async function buildWorkbook(model){
+ await ensureExcelJS();const s=buildSeries(model),wb=new ExcelJS.Workbook();wb.creator='Lean Performance Solutions';const ws=wb.addWorksheet('CURVA'),warnings=[];ws.getColumn(1).width=18;ws.getColumn(2).width=14;for(let c=FIRST_COL;c<=LAST_COL;c++)ws.getColumn(c).width=12;
+ for(const[label,row]of CURVE_BLOCKS){ws.mergeCells(row,1,row+5,1);const a=ws.getCell(row,1);a.value=label;a.style=clone(dataStyle);a.alignment={horizontal:'center',vertical:'middle',wrapText:true};for(let rr=row;rr<=row+5;rr++)ws.getRow(rr).height=20;const labels=['Data','Semana','Dia','Previsto','Replan','Realizado'];for(let i=0;i<6;i++){const c=ws.getCell(row+i,2);c.value=labels[i];c.style=clone(labelStyle)}const g=s.results.find(x=>x.label===label),win=groupWindow(g||{prev:new Map(),replan:new Map(),real:new Map()},model),dates=win.dates;
+  let visiblePrev=0,visibleReplan=0;for(let j=0;j<dates.length;j++){const d=dates[j],col=FIRST_COL+j,cells=[ws.getCell(row,col),ws.getCell(row+1,col),ws.getCell(row+2,col),ws.getCell(row+3,col),ws.getCell(row+4,col),ws.getCell(row+5,col)];for(const c of cells)c.style=clone(dataStyle);cells[0].value=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));cells[0].numFmt='dd/mm/yyyy';cells[1].value='S'+String(isoWeek(d)).padStart(2,'0');cells[2].value=dayLabel(d);const pv=g?.prevTotal?value(g.prev,d)/g.prevTotal:0,rp=(s.baseline.plannedBaseline&&g?.replanTotal)?value(g.replan,d)/g.replanTotal:0,rv=g?.prevTotal?value(g.real,d)/g.prevTotal:0;visiblePrev+=pv;visibleReplan+=rp;cells[3].value=pv;cells[4].value=rp;cells[5].value=rv;cells[3].numFmt=cells[4].numFmt=cells[5].numFmt='0.000000%'}
+  if(g?.prevTotal&&visiblePrev<0.999999)warnings.push({label,kind:'Previsto',pct:visiblePrev*100,span:win.span});if(s.baseline.plannedBaseline&&g?.replanTotal&&visibleReplan<0.999999)warnings.push({label,kind:'Replan',pct:visibleReplan*100,span:win.span})
+ }
+ const sc=scope(),suffix=[sc.obra,sc.area,sc.discipline].filter(Boolean).join('_');const baseName=model.sourceName||model.project?.name||'Cronograma',name=`Curvas_S_Unificadas_${safe(baseName)}${suffix?'_-_'+safe(suffix):''}.xlsx`;return{wb,name,series:s,warnings}
+}
+function updateDiagnostics(out){const m=$('#scheduleDiagMsg');if(!m)return;if(out.warnings.length){m.textContent='Atenção: '+out.warnings.map(w=>`${w.label} ${w.kind} ${w.pct.toFixed(2)}% (${w.span} dias)`).join(' · ');m.style.color='#92400e'}else{m.textContent='Curvas dentro da janela individual de cada disciplina; Previsto completo no template.';m.style.color='#166534'}}
+async function runCurveFixed(){const btn=$('#btnGenerateCurves'),old=btn?.textContent;try{if(btn){btn.disabled=true;btn.textContent='Gerando Curva S…'}status('Gerando Curva S com janela própria por disciplina…');const model=await getModel(),out=await buildWorkbook(model);updateDiagnostics(out);await saveWorkbook(out.wb,out.name);if(out.warnings.length){status(`Curva S gerada. ${out.warnings.length} bloco(s) excedem a janela fixa de ${DAYS} dias e foram sinalizados; nenhum percentual foi normalizado artificialmente.`,'warn')}else status('Curva S gerada no template oficial. Cada disciplina usa sua própria janela e o Previsto fecha em 100% quando o horizonte cabe no template.','ok');return out}catch(e){console.error(e);status(e.message||'Erro ao gerar Curva S.','error');throw e}finally{if(btn){btn.disabled=false;btn.textContent=old||'Baixar Curva S'}}}
+function install(){const e=window.LPS_TEMPLATE_ENGINE;if(!e){setTimeout(install,100);return}e.runCurve=runCurveFixed;e.version='6.0-curve-window';e.__lpsCurveWindowV6=true;window.LPS_CURVE_WINDOW_ENGINE={runCurve:runCurveFixed,days:DAYS}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
+})();
