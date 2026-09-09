@@ -11,10 +11,12 @@ RUN apt-get update \
 WORKDIR /app
 COPY package.json ./package.json
 RUN npm install --omit=dev
-COPY server-v3.mjs ./server-v3.mjs
+COPY server-v4.mjs ./server-v4.mjs
 COPY --from=java-builder /build/target/lps-mpp-converter.jar /app/java/lps-mpp-converter.jar
 ENV NODE_ENV=production
 ENV PORT=8787
 ENV MPXJ_FAT_JAR=/app/java/lps-mpp-converter.jar
+ENV OPENAI_MODEL=gpt-5.6-sol
+ENV OPENAI_REASONING_EFFORT=high
 EXPOSE 8787
-CMD ["node","server-v3.mjs"]
+CMD ["node","server-v4.mjs"]
