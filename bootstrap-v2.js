@@ -19,10 +19,14 @@
     if(document.querySelector('script[data-lps-multiobra]'))return;
     const m=document.createElement('script');m.src='multiobra-v1.js?v=20260909-5';m.dataset.lpsMultiobra='1';m.onerror=()=>showStatus('Falha ao carregar o motor Multiobra.','error');document.head.appendChild(m);
   }
+  function loadCurveSelection(){
+    if(document.querySelector('script[data-lps-curve-selection]'))return;
+    const c=document.createElement('script');c.src='curve-selection-v1.js?v=20260909-1';c.dataset.lpsCurveSelection='1';c.onerror=()=>showStatus('Falha ao carregar a seleção de obras para Curva S.','error');document.head.appendChild(c);
+  }
   function loadTemplateExporter(){
     if(document.querySelector('script[data-lps-template-exporter]'))return;
     const s=document.createElement('script');s.src='panel-export-v5.js?v=20260909-3';s.dataset.lpsTemplateExporter='5';s.onerror=()=>showStatus('Falha ao carregar o motor de Curva S / Histograma. Atualize a página.','error');
-    s.onload=()=>{if(document.querySelector('script[data-lps-auto-preview]'))return;const p=document.createElement('script');p.src='auto-preview-v1.js?v=20260909-3';p.dataset.lpsAutoPreview='1';p.onerror=()=>showStatus('Falha ao carregar a geração automática das prévias.','error');document.head.appendChild(p)};document.head.appendChild(s);
+    s.onload=()=>{if(!document.querySelector('script[data-lps-auto-preview]')){const p=document.createElement('script');p.src='auto-preview-v1.js?v=20260909-3';p.dataset.lpsAutoPreview='1';p.onerror=()=>showStatus('Falha ao carregar a geração automática das prévias.','error');document.head.appendChild(p)}loadCurveSelection()};document.head.appendChild(s);
   }
   function loadAILayer(){
     if(document.querySelector('script[data-lps-ai-layer]'))return;
@@ -33,7 +37,7 @@
   function runAfterImport(){
     if(triggered)return;const workspace=$('#workspace');if(!workspace||workspace.hidden)return;triggered=true;
     showStatus('Cronograma lido. Separando Obras → Áreas → Disciplinas, reconciliando HH e preparando IA…');
-    setTimeout(()=>$('#btnRunAudit')?.click(),180);setTimeout(()=>$('#btnBuildReport')?.click(),520);setTimeout(()=>window.LPS_MULTIOBRA?.render?.(),620);setTimeout(()=>window.LPS_AUTO_PREVIEW?.prepareAll?.(false),760);
+    setTimeout(()=>$('#btnRunAudit')?.click(),180);setTimeout(()=>$('#btnBuildReport')?.click(),520);setTimeout(()=>window.LPS_MULTIOBRA?.render?.(),620);setTimeout(()=>window.LPS_AUTO_PREVIEW?.prepareAll?.(false),760);setTimeout(()=>window.LPS_CURVE_SELECTION?.render?.(),900);
     setTimeout(()=>showStatus('Análise base concluída. Selecione GERAL, Obra, Área ou Disciplina para recalcular Curva S e Histograma.','ok'),1600);
   }
 
