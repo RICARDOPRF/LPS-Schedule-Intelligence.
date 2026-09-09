@@ -8,8 +8,9 @@ let loginPromise=null;
 
 function base(){return (localStorage.getItem('lps_api_base')||window.LPS_SCHEDULE_CONFIG?.apiBase||DEFAULT_API).trim().replace(/\/$/,'')}
 function token(){return sessionStorage.getItem(TOKEN_KEY)||''}
-function isApiRequest(input){const b=base();if(!b)return false;const url=typeof input==='string'?input:input?.url||'';return url.startsWith(b+'/')||url===b}
-function isLoginRequest(input){const url=typeof input==='string'?input:input?.url||'';return url.endsWith('/v1/auth/login')}
+function requestUrl(input){return typeof input==='string'?input:input?.url||''}
+function isApiRequest(input){const b=base();if(!b)return false;const url=requestUrl(input);return url.startsWith(b+'/')||url===b}
+function isLoginRequest(input){return requestUrl(input).endsWith('/v1/auth/login')}
 function withAuth(init={}){
  const h=new Headers(init.headers||{});const t=token();
  if(t&&!h.has('Authorization'))h.set('Authorization','Bearer '+t);
@@ -31,18 +32,27 @@ async function login(){
  })();
  try{return await loginPromise}finally{loginPromise=null}
 }
+function captureParsedModel(response,url){
+ if(!response?.ok||!url.endsWith('/v1/parse/mpp'))return;
+ response.clone().json().then(model=>{
+   if(!model||!Array.isArray(model.tasks))return;
+   window.LPS_LAST_MODEL=model;
+   window.dispatchEvent(new CustomEvent('lps-model-ready',{detail:{model}}));
+ }).catch(()=>{});
+}
 window.lpsApi={
  login,
  logout(){sessionStorage.removeItem(TOKEN_KEY);window.dispatchEvent(new CustomEvent('lps-api-auth',{detail:{authenticated:false}}));},
  get authenticated(){return !!token()},
+ get model(){return window.LPS_LAST_MODEL||null},
  async health(){const b=base();if(!b)throw new Error('API não configurada.');return nativeFetch(b+'/health',{credentials:'omit'}).then(r=>r.json())}
 };
 
 window.fetch=async function(input,init={}){
  if(!isApiRequest(input)||isLoginRequest(input))return nativeFetch(input,init);
- // Parser V2 uses HTTPS + strict origin/IP/rate limits and no cookies.
- // Force credentials=omit so GitHub Pages cross-origin uploads are accepted by Chrome.
+ const url=requestUrl(input);
  const response=await nativeFetch(input,withAuth(init));
+ captureParsedModel(response,url);
  return response;
 };
 })();
