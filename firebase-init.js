@@ -1,5 +1,9 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import {
+  getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendPasswordResetEmail, signOut
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import {
   getDatabase, ref, set, update, push, get, query, orderByChild, limitToLast, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
@@ -18,11 +22,22 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+const authApi = {
+  signInGoogle: () => signInWithPopup(auth, googleProvider),
+  signInEmail: (email, password) => signInWithEmailAndPassword(auth, email, password),
+  createAccount: (email, password) => createUserWithEmailAndPassword(auth, email, password),
+  resetPassword: email => sendPasswordResetEmail(auth, email),
+  signOut: () => signOut(auth)
+};
 
 window.LPS_FIREBASE = {
   app,
   auth,
   db,
+  authApi,
   database: { ref, set, update, push, get, query, orderByChild, limitToLast, serverTimestamp },
   config: {
     projectId: firebaseConfig.projectId,
@@ -40,11 +55,12 @@ onAuthStateChanged(auth, user => {
       signedIn: !!user,
       uid: user?.uid || null,
       email: user?.email || null,
-      displayName: user?.displayName || null
+      displayName: user?.displayName || null,
+      photoURL: user?.photoURL || null
     }
   }));
 });
 
 window.dispatchEvent(new CustomEvent('lps-firebase-ready', {
-  detail: { projectId: firebaseConfig.projectId, database: true }
+  detail: { projectId: firebaseConfig.projectId, database: true, auth: true }
 }));
