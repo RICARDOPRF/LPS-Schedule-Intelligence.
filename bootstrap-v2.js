@@ -17,7 +17,7 @@
   }
   function loadMultiobra(){
     if(document.querySelector('script[data-lps-multiobra]'))return;
-    const m=document.createElement('script');m.src='multiobra-v1.js?v=20260909-4';m.dataset.lpsMultiobra='1';m.onerror=()=>showStatus('Falha ao carregar o motor Multiobra.','error');document.head.appendChild(m);
+    const m=document.createElement('script');m.src='multiobra-v1.js?v=20260909-5';m.dataset.lpsMultiobra='1';m.onerror=()=>showStatus('Falha ao carregar o motor Multiobra.','error');document.head.appendChild(m);
   }
   function loadTemplateExporter(){
     if(document.querySelector('script[data-lps-template-exporter]'))return;
