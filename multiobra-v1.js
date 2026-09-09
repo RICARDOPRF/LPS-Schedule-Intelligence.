@@ -6,7 +6,7 @@ const state={model:null,exportScope:false,engineWrapped:false,renderTimer:null,a
 const norm=s=>(s??'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const esc=s=>(s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const n=v=>Number(v)||0;
-const GENERIC=/\b(cronograma|schedule|projeto|project|usina|planta|empreendimento|master|geral|overall|principal)\b/i;
+const GENERIC=/\b(cronograma|schedule|projeto|project|usina|planta|empreendimento|master|geral|overall|principal|execucao|execution|desmobilizacao|demobilization|mobilizacao|mobilization|encerramento|closeout)\b/i;
 const DISC=/\b(civil|mecan|eletric|instrument|tubul|piping|estrutura|pintura|andaime|comission|equipamento|suporte|fabric|montag|automacao|refrat|isolamento)\b/i;
 const AREA_CODE=/^\s*\d{3,5}\s*[-–—]/;
 function cval(t,re){for(const[k,v]of Object.entries(t.custom||{})){if(re.test(norm(k))&&String(v??'').trim())return String(v).trim()}return''}
@@ -14,11 +14,19 @@ function isGenericRoot(s){return !!s&&!AREA_CODE.test(s)&&GENERIC.test(norm(s))}
 function isAreaNode(s){return AREA_CODE.test(String(s||''))}
 function isDisciplineNode(s){return DISC.test(norm(s))&&!isAreaNode(s)}
 function cleanArea(s){return String(s||'').trim().replace(/^\s*(area|área)\s*[:\-–—]\s*/i,'')}
+function generalPhaseLabel(label){
+ const s=String(label||'').trim(),x=norm(s);if(!x)return'';
+ if(/\b(desmobilizacao|demobilization)\b/.test(x))return s;
+ if(/\b(mobilizacao|mobilization)\b/.test(x))return s;
+ if((/\b(comission|commission)\w*\b/.test(x)&&/\b(test|teste)\w*\b/.test(x))||/^testes?$/.test(x))return s;
+ if(/\b(encerramento|closeout)\b/.test(x))return s;
+ return'';
+}
 function canonicalMacro(label){
  let s=String(label||'').trim();if(!s||isGenericRoot(s)||isAreaNode(s))return'';
  const parts=s.split(/\s*[-–—]\s*/).filter(Boolean);
  if(parts.length>1){const p=norm(parts[0]);if(/^\d+$/.test(p))return'';if(/^(o )?(civil|mecanica|mecanico|eletrica|eletrico|instrumentacao|tubulacao|montagem|fabricacao|equipamentos|comissionamento)$/.test(p))s=parts.slice(1).join(' - ');else if(/^[A-Z0-9]{2,8}$/.test(parts[0].trim())&&!/^\d+$/.test(parts[0].trim()))s=parts[0].trim()}
- s=s.replace(/^\s*(obra|unidade|setor|pacote|package|tancagem)\s+(?=\S)/i,'').trim();
+ s=s.replace(/^\s*(obra|unidade|setor|pacote|package)\s+(?=\S)/i,'').trim();
  return s;
 }
 function canonicalDiscipline(raw,taskName=''){
@@ -50,19 +58,22 @@ function enrichModel(model){
    let obra=canonicalMacro(explicitObra)||parent.obra||'';
    if(!obra&&t.summary&&!isGenericRoot(t.name)&&!isAreaNode(t.name)){const c=canonicalMacro(t.name);if(c&&!isDisciplineNode(c))obra=c}
    if(!obra){for(const p of stack){const c=canonicalMacro(p.task?.name);if(c&&!isGenericRoot(p.task?.name)&&!isAreaNode(p.task?.name)&&!isDisciplineNode(c)){obra=c;break}}}
+   const generalPhase=obra?'':(generalPhaseLabel(t.name)||parent.generalPhase||'');
    let area=cleanArea(explicitArea)||parent.area||'';
    if(!area&&t.summary&&isAreaNode(t.name))area=cleanArea(t.name);
    if(!area){for(let i=stack.length-1;i>=0;i--){const nm=stack[i].task?.name||'';if(isAreaNode(nm)){area=cleanArea(nm);break}}}
    let disc=canonicalDiscipline(explicitDisc||phase,t.name)||parent.disc||'';
-   if(!t.summary){if(!obra)obraMissing++;if(!area)areaMissing++;if(!disc)discMissing++}
-   setField(t,'Setor',obra);setField(t,'Area',area);setField(t,'Disciplina',disc);
-   t.lpsObra=obra;t.lpsArea=area;t.lpsDiscipline=disc;
-   if(t.summary)stack.push({task:t,ctx:{obra,area,disc,phase}});
+   if(!t.summary){if(!obra&&!generalPhase)obraMissing++;if(obra&&!area)areaMissing++;if(obra&&!disc)discMissing++}
+   setField(t,'Obra',obra);setField(t,'Setor',obra);setField(t,'Area',area);setField(t,'Disciplina',disc);
+   t.lpsObra=obra;t.lpsArea=area;t.lpsDiscipline=disc;t.lpsGeneralPhase=generalPhase;
+   if(t.summary)stack.push({task:t,ctx:{obra,area,disc,phase,generalPhase}});
  }
- const leaves=(model.tasks||[]).filter(t=>!t.summary),totWork=leaves.reduce((a,t)=>a+n(t.workHours),0),totActual=leaves.reduce((a,t)=>a+n(t.actualWorkHours),0);
- const obras=[...new Set(leaves.map(t=>t.lpsObra).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
- const obraTotals=Object.fromEntries(obras.map(o=>[o,{tasks:leaves.filter(t=>t.lpsObra===o).length,workHours:leaves.filter(t=>t.lpsObra===o).reduce((a,t)=>a+n(t.workHours),0),actualWorkHours:leaves.filter(t=>t.lpsObra===o).reduce((a,t)=>a+n(t.actualWorkHours),0)}]));
- model.lpsHierarchy={obras,obraTotals,totalLeafTasks:leaves.length,totalWorkHours:totWork,totalActualWorkHours:totActual,obraMissing,areaMissing,discMissing};
+ const leaves=(model.tasks||[]).filter(t=>!t.summary),obraLeaves=leaves.filter(t=>t.lpsObra),generalLeaves=leaves.filter(t=>!t.lpsObra&&t.lpsGeneralPhase),unclassifiedLeaves=leaves.filter(t=>!t.lpsObra&&!t.lpsGeneralPhase),totWork=leaves.reduce((a,t)=>a+n(t.workHours),0),totActual=leaves.reduce((a,t)=>a+n(t.actualWorkHours),0);
+ const obras=[...new Set(obraLeaves.map(t=>t.lpsObra).filter(Boolean))];
+ const generalPhases=[...new Set(generalLeaves.map(t=>t.lpsGeneralPhase).filter(Boolean))];
+ const obraTotals=Object.fromEntries(obras.map(o=>[o,{tasks:obraLeaves.filter(t=>t.lpsObra===o).length,workHours:obraLeaves.filter(t=>t.lpsObra===o).reduce((a,t)=>a+n(t.workHours),0),actualWorkHours:obraLeaves.filter(t=>t.lpsObra===o).reduce((a,t)=>a+n(t.actualWorkHours),0)}]));
+ const obraWorkHours=obraLeaves.reduce((a,t)=>a+n(t.workHours),0),generalWorkHours=generalLeaves.reduce((a,t)=>a+n(t.workHours),0),unclassifiedWorkHours=unclassifiedLeaves.reduce((a,t)=>a+n(t.workHours),0);
+ model.lpsHierarchy={obras,generalPhases,obraTotals,totalLeafTasks:leaves.length,totalWorkHours:totWork,totalActualWorkHours:totActual,obraWorkHours,generalWorkHours,unclassifiedWorkHours,classifiedWorkHours:obraWorkHours+generalWorkHours,obraMissing,areaMissing,discMissing};
  return model;
 }
 function scope(){return{obra:$('#filterSector')?.value||'',area:$('#filterArea')?.value||'',discipline:$('#filterDiscipline')?.value||''}}
@@ -89,12 +100,12 @@ function ensureUI(){
 }
 function metric(k,v){return`<div style="border:1px solid #dbeafe;border-radius:10px;padding:10px;background:#fff"><small style="display:block;color:#64748b">${esc(k)}</small><b style="display:block;margin-top:4px;color:#172554">${esc(v)}</b></div>`}
 function renderTabs(h){const tabs=$('#obraTabs');if(!tabs)return;const current=$('#filterSector')?.value||'';tabs.innerHTML=[`<button class="${!current?'primary':'ghost'}" data-obra-tab="">GERAL</button>`,...(h.obras||[]).map(o=>`<button class="${current===o?'primary':'ghost'}" data-obra-tab="${esc(o)}">${esc(o)}</button>`)].join('');tabs.querySelectorAll('[data-obra-tab]').forEach(b=>b.onclick=()=>{const sel=$('#filterSector');if(!sel)return;sel.value=b.dataset.obraTab||'';sel.dispatchEvent(new Event('change',{bubbles:true}));bumpExportFileVersion();setTimeout(()=>{renderMultiobra();window.LPS_AUTO_PREVIEW?.prepareAll?.(true)},80)})}
-function renderSuggestions(){const q=$('#lpsSuggestionQueue');if(!q)return;const h=state.model?.lpsHierarchy||{},items=[];if(h.obraMissing)items.push({id:'LPS-AI-001',title:'Atividades sem Obra',text:`${h.obraMissing} atividades executivas ainda não foram associadas a uma obra.`});if(h.areaMissing)items.push({id:'LPS-AI-002',title:'Atividades sem Área',text:`${h.areaMissing} atividades executivas ainda não possuem área.`});if(h.discMissing)items.push({id:'LPS-AI-003',title:'Atividades sem Disciplina',text:`${h.discMissing} atividades executivas ainda não possuem disciplina.`});for(const f of state.aiFindings.slice(0,6))items.push({id:`LPS-AI-${String(items.length+10).padStart(3,'0')}`,title:f.title||f.category||'Melhoria sugerida pela IA',text:f.recommendation||f.impact||f.evidence||''});if(!items.length){q.innerHTML='<div class="muted-box"><b>Fila de melhorias</b><br>Nenhuma melhoria estrutural pendente detectada.</div>';return}q.innerHTML='<h4 style="margin:0 0 8px">Fila de melhorias sugeridas</h4>'+items.map(x=>`<div style="padding:10px 0;border-top:1px solid #e5e7eb"><b>${x.id} · ${esc(x.title)}</b><div style="font-size:13px;color:#475569;margin-top:3px">${esc(x.text)}</div><button class="ghost" style="margin-top:7px" data-copy-suggestion="${x.id}">Copiar ID para aprovação</button></div>`).join('');q.querySelectorAll('[data-copy-suggestion]').forEach(b=>b.onclick=()=>navigator.clipboard?.writeText(`${b.dataset.copySuggestion} — de acordo`).catch(()=>{}))}
+function renderSuggestions(){const q=$('#lpsSuggestionQueue');if(!q)return;const h=state.model?.lpsHierarchy||{},items=[];if(h.obraMissing)items.push({id:'LPS-AI-001',title:'Atividades sem Obra',text:`${h.obraMissing} atividades executivas ainda não foram associadas a uma obra nem a uma fase geral.`});if(h.areaMissing)items.push({id:'LPS-AI-002',title:'Atividades sem Área',text:`${h.areaMissing} atividades das obras ainda não possuem área.`});if(h.discMissing)items.push({id:'LPS-AI-003',title:'Atividades sem Disciplina',text:`${h.discMissing} atividades das obras ainda não possuem disciplina.`});for(const f of state.aiFindings.slice(0,6))items.push({id:`LPS-AI-${String(items.length+10).padStart(3,'0')}`,title:f.title||f.category||'Melhoria sugerida pela IA',text:f.recommendation||f.impact||f.evidence||''});if(!items.length){q.innerHTML='<div class="muted-box"><b>Fila de melhorias</b><br>Nenhuma melhoria estrutural pendente detectada.</div>';return}q.innerHTML='<h4 style="margin:0 0 8px">Fila de melhorias sugeridas</h4>'+items.map(x=>`<div style="padding:10px 0;border-top:1px solid #e5e7eb"><b>${x.id} · ${esc(x.title)}</b><div style="font-size:13px;color:#475569;margin-top:3px">${esc(x.text)}</div><button class="ghost" style="margin-top:7px" data-copy-suggestion="${x.id}">Copiar ID para aprovação</button></div>`).join('');q.querySelectorAll('[data-copy-suggestion]').forEach(b=>b.onclick=()=>navigator.clipboard?.writeText(`${b.dataset.copySuggestion} — de acordo`).catch(()=>{}))}
 function renderMultiobra(){
- if(!state.model)return;ensureUI();const h=state.model.lpsHierarchy||{},leaves=selectedLeaves(),scopeWork=leaves.reduce((a,t)=>a+n(t.workHours),0),scopeActual=leaves.reduce((a,t)=>a+n(t.actualWorkHours),0),classified=h.totalWorkHours-leaves.filter(t=>!t.lpsObra).reduce((a,t)=>a+n(t.workHours),0),diff=h.totalWorkHours-classified,coverage=h.totalWorkHours?classified/h.totalWorkHours*100:100,areas=new Set(leaves.map(t=>t.lpsArea).filter(Boolean)),disc=new Set(leaves.map(t=>t.lpsDiscipline).filter(Boolean));
- renderTabs(h);const m=$('#multiobraMetrics');if(m)m.innerHTML=[metric('Obras detectadas',h.obras?.length||0),metric('Áreas no escopo',areas.size),metric('Disciplinas no escopo',disc.size),metric('Atividades no escopo',leaves.length.toLocaleString('pt-BR')),metric('HH previsto no escopo',scopeWork.toLocaleString('pt-BR',{maximumFractionDigits:1})),metric('HH real no escopo',scopeActual.toLocaleString('pt-BR',{maximumFractionDigits:1}))].join('');
+ if(!state.model)return;ensureUI();const h=state.model.lpsHierarchy||{},leaves=selectedLeaves(),scopeWork=leaves.reduce((a,t)=>a+n(t.workHours),0),scopeActual=leaves.reduce((a,t)=>a+n(t.actualWorkHours),0),diff=n(h.unclassifiedWorkHours),coverage=h.totalWorkHours?100*n(h.classifiedWorkHours)/h.totalWorkHours:100,areas=new Set(leaves.map(t=>t.lpsArea).filter(Boolean)),disc=new Set(leaves.map(t=>t.lpsDiscipline).filter(Boolean));
+ renderTabs(h);const m=$('#multiobraMetrics');if(m)m.innerHTML=[metric('Obras detectadas',h.obras?.length||0),metric('Fases gerais',h.generalPhases?.length||0),metric('Áreas no escopo',areas.size),metric('Disciplinas no escopo',disc.size),metric('Atividades no escopo',leaves.length.toLocaleString('pt-BR')),metric('HH previsto no escopo',scopeWork.toLocaleString('pt-BR',{maximumFractionDigits:1})),metric('HH real no escopo',scopeActual.toLocaleString('pt-BR',{maximumFractionDigits:1}))].join('');
  const integ=$('#multiobraIntegrity');if(integ){integ.textContent=`Integridade ${coverage.toFixed(2)}%`;integ.style.background=coverage>=99.99?'#dcfce7':'#fef3c7';integ.style.color=coverage>=99.99?'#166534':'#92400e'}
- const r=$('#multiobraReconciliation');if(r)r.innerHTML=`<div class="muted-box"><b>Reconciliação:</b> ${h.obras?.length||0} obras · ${h.totalLeafTasks||0} atividades executivas · ${h.totalWorkHours?.toLocaleString('pt-BR',{maximumFractionDigits:1})||0} HH previstos. Diferença não classificada: <b>${diff.toLocaleString('pt-BR',{maximumFractionDigits:2})} HH</b>. ${h.obraMissing||0} sem Obra · ${h.areaMissing||0} sem Área · ${h.discMissing||0} sem Disciplina.</div>`;
+ const r=$('#multiobraReconciliation');if(r)r.innerHTML=`<div class="muted-box"><b>Reconciliação:</b> ${h.obras?.length||0} obras + ${h.generalPhases?.length||0} fases gerais · ${h.totalLeafTasks||0} atividades executivas · ${h.totalWorkHours?.toLocaleString('pt-BR',{maximumFractionDigits:1})||0} HH previstos. HH das obras: <b>${n(h.obraWorkHours).toLocaleString('pt-BR',{maximumFractionDigits:1})}</b> · HH de fases gerais: <b>${n(h.generalWorkHours).toLocaleString('pt-BR',{maximumFractionDigits:1})}</b> · Não classificado: <b>${diff.toLocaleString('pt-BR',{maximumFractionDigits:2})} HH</b>. ${h.obraMissing||0} sem Obra/Fase · ${h.areaMissing||0} sem Área · ${h.discMissing||0} sem Disciplina.</div>`;
  renderSuggestions();
 }
 function scheduleRender(){clearTimeout(state.renderTimer);state.renderTimer=setTimeout(renderMultiobra,220)}
